@@ -190,7 +190,7 @@ class Calculation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class CalculationVersion(UUIDPrimaryKeyMixin, Base):
-    """Immutable input/rule/engine/output snapshot for a calculation."""
+    """Append-only, tamper-evident input/rule/engine/output calculation snapshot."""
 
     __tablename__ = "calculation_versions"
     __table_args__ = (
@@ -215,6 +215,18 @@ class CalculationVersion(UUIDPrimaryKeyMixin, Base):
             ondelete="RESTRICT",
         ),
         CheckConstraint("version > 0", name="ck_calculation_version_positive"),
+        CheckConstraint(
+            "input_sha256 IS NULL OR length(input_sha256) = 64",
+            name="ck_calculation_version_input_sha256_length",
+        ),
+        CheckConstraint(
+            "ruleset_sha256 IS NULL OR length(ruleset_sha256) = 64",
+            name="ck_calculation_version_ruleset_sha256_length",
+        ),
+        CheckConstraint(
+            "output_sha256 IS NULL OR length(output_sha256) = 64",
+            name="ck_calculation_version_output_sha256_length",
+        ),
         Index(
             "ix_calculation_version_org_calculation",
             "organization_id",
@@ -226,10 +238,14 @@ class CalculationVersion(UUIDPrimaryKeyMixin, Base):
     calculation_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     created_by_user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
+    engine_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
     engine_version: Mapped[str] = mapped_column(String(80), nullable=False)
     input_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    input_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ruleset_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    ruleset_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     output_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    output_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
