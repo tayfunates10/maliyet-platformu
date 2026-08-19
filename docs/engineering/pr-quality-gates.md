@@ -22,9 +22,20 @@ Her PR için, kapsam uygunsa:
 - Eski hesaplamaların yeniden üretilebilirliği regression testiyle korunmalıdır.
 - Kalite eşiğini gevşeterek test geçirme kabul edilmez.
 
-## PR boyutu
+## Veritabanı/tenant değişikliklerinde ek kapılar
 
-PR tek bir amaç taşımalıdır. Büyük değişiklikler stacked PR'lara bölünür. Alt PR, bağımlı olduğu branch'i base alabilir; üst PR merge edilince alt PR `main`e retarget edilir.
+- Migration `upgrade -> downgrade -> upgrade` round-trip testinden geçmelidir.
+- Alembic metadata drift kontrolü PASS olmalıdır.
+- Çapraz-tenant okuma uygulama seviyesinde fail-closed test edilmelidir.
+- Çapraz-tenant foreign-key/ownership ilişkileri veritabanı seviyesinde reddedilmelidir.
+- Testler gerçek PostgreSQL üzerinde çalışmalıdır.
+
+## PR boyutu ve merge sırası
+
+PR tek bir amaç taşımalıdır. Büyük işler birbirini takip eden küçük PR'lara bölünür.
+Her PR güncel `main` dalından açılır. Önceki PR tüm zorunlu kapılar yeşil olup
+`main`e merge edilmeden sonraki PR başlatılmaz. Yeşil PR'lar squash merge ile
+`main`e alınır; kırmızı PR merge edilmez.
 
 ## Teslim raporu şablonu
 
