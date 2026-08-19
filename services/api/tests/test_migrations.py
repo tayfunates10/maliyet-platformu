@@ -10,6 +10,7 @@ from app.models import Base
 EXPECTED_TABLES = {
     "alembic_version",
     "audit_events",
+    "auth_sessions",
     "business_profiles",
     "calculation_versions",
     "calculations",
