@@ -140,7 +140,7 @@ def test_authenticated_writer_is_the_persisted_actor(db_session: Session) -> Non
     )
     assert version is not None
     assert version.created_by_user_id == user.id
-    assert version.id == body["calculation_version_id"]
+    assert str(version.id) == body["calculation_version_id"]
 
     audit = db_session.scalar(
         select(AuditEvent).where(
