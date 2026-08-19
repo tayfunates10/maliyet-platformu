@@ -11,11 +11,19 @@ REQUIRED_FILES = (
     "SECURITY.md",
     "docs/product-scope.md",
     "docs/adr/0001-system-architecture.md",
+    "docs/adr/0002-tenant-data-model.md",
     "docs/engineering/pr-quality-gates.md",
     ".github/pull_request_template.md",
     "services/api/pyproject.toml",
+    "services/api/alembic.ini",
+    "services/api/alembic/env.py",
+    "services/api/alembic/versions/0001_tenant_core.py",
     "services/api/app/main.py",
+    "services/api/app/models.py",
+    "services/api/app/tenancy.py",
     "services/api/tests/test_health.py",
+    "services/api/tests/test_migrations.py",
+    "services/api/tests/test_tenant_isolation.py",
     "apps/web/package.json",
     "apps/web/app/page.tsx",
     "apps/web/scripts/check-contract.mjs",
@@ -26,6 +34,7 @@ AGENT_GUARDRAILS = (
     "Para hesapları binary `float` ile yapılmaz.",
     "Tenant izolasyonu güvenlik sınırıdır",
     "CI kırmızıysa iş tamamlandı olarak raporlanmaz.",
+    "Her yeni PR güncel `main` dalından açılır.",
 )
 
 

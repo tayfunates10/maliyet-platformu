@@ -27,9 +27,12 @@ E-ticaret bir NACE sektörü gibi modellenmez; satış kanalı/operasyon modeli 
 ## 4. Git/PR akışı
 
 - `main` production-line ana daldır.
+- Her yeni PR güncel `main` dalından açılır.
 - Geliştirme `feat/NNN-kisa-ad`, `fix/NNN-kisa-ad`, `chore/NNN-kisa-ad` dallarında yapılır.
-- Stacked PR kullanılabilir. Alt PR, bağımlı olduğu üst dalı base alır; üst PR birleşince base `main`e çevrilir.
-- Kullanıcının açık onayı olmadan PR merge edilmez.
+- Açık stacked PR zinciri kullanılmaz; önceki PR merge edilmeden sonraki PR başlatılmaz.
+- Tüm zorunlu CI kapıları yeşilse PR squash merge ile `main`e alınır.
+- Merge sonrası sıradaki PR yeniden güncel `main` dalından açılır.
+- CI, migration veya güvenlik kapılarından biri kırmızıysa merge yapılmaz.
 
 ## 5. PR teslim raporu
 
@@ -54,6 +57,8 @@ Her PR açıklaması en az şunları içerir:
 - Dış sistemler adapter sınırı arkasında tutulmalıdır.
 - Yeni davranış testsiz eklenmez.
 - Financial rounding açık bir politika ile uygulanır; çağıranın rastgele `round()` kullanmasına izin verilmez.
+- Tenant-owned tablo ilişkileri yalnız uygulama filtresine bırakılmaz; mümkün olduğunda veritabanı constraint'leri ile de korunur.
+- Migration dosyaları geri alınabilir olmalı ve model metadata'sı ile drift testinden geçmelidir.
 
 ## 7. Devralma sırası
 
@@ -63,5 +68,6 @@ Yeni geliştirici şu sırayla okumalıdır:
 2. `AGENTS.md`
 3. `docs/product-scope.md`
 4. `docs/adr/0001-system-architecture.md`
-5. `docs/engineering/pr-quality-gates.md`
-6. İlgili açık PR'ın açıklaması ve yorumları
+5. İlgili sonraki ADR
+6. `docs/engineering/pr-quality-gates.md`
+7. İlgili açık PR'ın açıklaması ve yorumları
