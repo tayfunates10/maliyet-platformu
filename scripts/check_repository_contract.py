@@ -16,6 +16,9 @@ REQUIRED_FILES = (
     "services/api/pyproject.toml",
     "services/api/app/main.py",
     "services/api/tests/test_health.py",
+    "apps/web/package.json",
+    "apps/web/app/page.tsx",
+    "apps/web/scripts/check-contract.mjs",
 )
 
 AGENT_GUARDRAILS = (
