@@ -19,8 +19,13 @@ from app.models import (
 )
 
 
-def _override_database(db_session: Session) -> Iterator[Session]:
-    yield db_session
+def _install_database_override(db_session: Session) -> None:
+    """Inject the real test Session through FastAPI's generator dependency protocol."""
+
+    def override_database() -> Iterator[Session]:
+        yield db_session
+
+    app.dependency_overrides[get_database_session] = override_database
 
 
 def _trade_payload() -> dict[str, object]:
@@ -76,7 +81,7 @@ def test_execution_requires_bearer_authentication(db_session: Session) -> None:
         suffix="no-auth",
         role="owner",
     )
-    app.dependency_overrides[get_database_session] = lambda: _override_database(db_session)
+    _install_database_override(db_session)
     try:
         response = TestClient(app).post(_path(organization, calculation), json=_trade_payload())
     finally:
@@ -93,7 +98,7 @@ def test_viewer_membership_cannot_execute_calculation(db_session: Session) -> No
         suffix="viewer",
         role="viewer",
     )
-    app.dependency_overrides[get_database_session] = lambda: _override_database(db_session)
+    _install_database_override(db_session)
     try:
         response = TestClient(app).post(
             _path(organization, calculation),
@@ -113,7 +118,7 @@ def test_authenticated_writer_is_the_persisted_actor(db_session: Session) -> Non
         suffix="writer",
         role="analyst",
     )
-    app.dependency_overrides[get_database_session] = lambda: _override_database(db_session)
+    _install_database_override(db_session)
     try:
         response = TestClient(app).post(
             _path(organization, calculation),
@@ -159,7 +164,7 @@ def test_request_body_cannot_spoof_actor_identity(db_session: Session) -> None:
 
     payload = _trade_payload()
     payload["created_by_user_id"] = str(other.id)
-    app.dependency_overrides[get_database_session] = lambda: _override_database(db_session)
+    _install_database_override(db_session)
     try:
         response = TestClient(app).post(
             _path(organization, calculation),
@@ -186,7 +191,7 @@ def test_authenticated_user_cannot_cross_tenant_boundary(db_session: Session) ->
         role="owner",
     )
     path = f"/organizations/{other_org.id}/calculations/{other_calculation.id}/execute/trade"
-    app.dependency_overrides[get_database_session] = lambda: _override_database(db_session)
+    _install_database_override(db_session)
     try:
         response = TestClient(app).post(
             path,
