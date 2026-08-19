@@ -8,12 +8,14 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from app.models import Base
+from app.rules_models import RuleDefinition, RuleSource, RuleVersion
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+REGISTERED_RULE_MODELS = (RuleDefinition, RuleSource, RuleVersion)
 target_metadata = Base.metadata
 
 
