@@ -1,0 +1,61 @@
+"""HTTP tests for the non-executable engine catalog."""
+
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+client = TestClient(app)
+
+
+def test_engine_catalog_lists_all_allowlisted_engines() -> None:
+    response = client.get("/engines")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert {item["key"] for item in payload} == {
+        "food_manufacturing",
+        "textile_manufacturing",
+        "basic_metals",
+        "ecommerce",
+        "trade",
+        "transportation",
+        "accommodation",
+        "tourism",
+    }
+    assert all(item["execution_requires_trusted_actor"] is True for item in payload)
+    assert all(item["regulatory_rules_applied"] is False for item in payload)
+
+
+def test_engine_detail_returns_strict_input_schema() -> None:
+    response = client.get("/engines/trade")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["key"] == "trade"
+    assert payload["input_schema"]["type"] == "object"
+    assert payload["input_schema"]["additionalProperties"] is False
+
+
+def test_unknown_engine_returns_404() -> None:
+    response = client.get("/engines/not-real")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "engine not found"}
+
+
+def test_public_execution_endpoint_is_not_exposed_before_auth() -> None:
+    response = client.post(
+        "/engines/trade/execute",
+        json={
+            "sales": [
+                {
+                    "key": "sale",
+                    "quantity": "1",
+                    "unit_sale_price": "100.00",
+                    "unit_acquisition_cost": "40.00",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 404
