@@ -1,6 +1,6 @@
 """Add replay provenance and snapshot-integrity fields to calculation versions.
 
-Revision ID: 0003_calculation_version_provenance
+Revision ID: 0003_calc_version_provenance
 Revises: 0002_rules_engine_foundation
 Create Date: 2026-08-19
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "0003_calculation_version_provenance"
+revision: str = "0003_calc_version_provenance"
 down_revision: str | None = "0002_rules_engine_foundation"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
