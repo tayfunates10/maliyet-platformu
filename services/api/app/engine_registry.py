@@ -7,10 +7,11 @@ from caller input.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from types import MappingProxyType
-from typing import Callable, Mapping, cast
+from typing import cast
 from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
@@ -487,21 +488,21 @@ _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
     {
         "food_manufacturing": RegisteredEngine(
             key="food_manufacturing",
-            title="Gıda üretimi",
+            title="Gida uretimi",
             engine_version=food_manufacturing.ENGINE_VERSION,
             input_model=FoodEngineInput,
             executor=_execute_food,
         ),
         "textile_manufacturing": RegisteredEngine(
             key="textile_manufacturing",
-            title="Tekstil üretimi",
+            title="Tekstil uretimi",
             engine_version=textile_manufacturing.ENGINE_VERSION,
             input_model=TextileEngineInput,
             executor=_execute_textile,
         ),
         "basic_metals": RegisteredEngine(
             key="basic_metals",
-            title="Ana metal üretimi",
+            title="Ana metal uretimi",
             engine_version=basic_metals_manufacturing.ENGINE_VERSION,
             input_model=BasicMetalsEngineInput,
             executor=_execute_basic_metals,
@@ -522,7 +523,7 @@ _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
         ),
         "transportation": RegisteredEngine(
             key="transportation",
-            title="Ulaştırma / lojistik",
+            title="Ulastirma / lojistik",
             engine_version=transportation_engine.ENGINE_VERSION,
             input_model=TransportationEngineInput,
             executor=_execute_transportation,
