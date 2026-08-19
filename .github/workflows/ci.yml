@@ -47,3 +47,27 @@ jobs:
         run: mypy app
       - name: Pytest
         run: pytest
+
+  web-quality:
+    name: Web quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify web contract
+        run: npm run contract
+      - name: Install exact direct dependencies
+        run: npm install --no-audit --no-fund --no-package-lock
+      - name: Biome lint
+        run: npm run lint
+      - name: TypeScript 7 CLI
+        run: npm run typecheck
+      - name: Next.js build
+        run: npm run build
