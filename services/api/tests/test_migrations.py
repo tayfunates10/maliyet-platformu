@@ -1,10 +1,10 @@
 """Migration reversibility, revision safety and model/migration parity tests."""
 
+from alembic.script import ScriptDirectory
 from conftest import alembic_config, database_url
 from sqlalchemy import create_engine, inspect
 
 from alembic import command
-from alembic.script import ScriptDirectory
 from app import auth_context, rules_models
 from app.models import Base
 
