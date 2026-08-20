@@ -27,6 +27,7 @@ REQUIRED_FILES = (
     "docs/adr/0015-calculation-orchestration.md",
     "docs/adr/0016-engine-registry-execution-boundary.md",
     "docs/adr/0017-authenticated-actor-context.md",
+    "docs/adr/0018-calculation-lifecycle-api.md",
     "docs/data-sources/turkiye-authoritative-sources.md",
     "docs/engineering/pr-quality-gates.md",
     ".github/pull_request_template.md",
@@ -66,6 +67,7 @@ REQUIRED_FILES = (
     "services/api/app/engine_registry.py",
     "services/api/app/auth_context.py",
     "services/api/app/http_dependencies.py",
+    "services/api/tests/conftest.py",
     "services/api/tests/test_health.py",
     "services/api/tests/test_migrations.py",
     "services/api/tests/test_tenant_isolation.py",
@@ -87,6 +89,7 @@ REQUIRED_FILES = (
     "services/api/tests/test_registered_engine_persistence.py",
     "services/api/tests/test_auth_context.py",
     "services/api/tests/test_authenticated_execution_api.py",
+    "services/api/tests/test_calculation_lifecycle_api.py",
     "apps/web/package.json",
     "apps/web/app/page.tsx",
     "apps/web/scripts/check-contract.mjs",
@@ -98,6 +101,9 @@ AGENT_GUARDRAILS = (
     "Tenant izolasyonu güvenlik sınırıdır",
     "CI kırmızıysa iş tamamlandı olarak raporlanmaz.",
     "Her yeni PR güncel `main` dalından açılır.",
+    "Alembic revision kimlikleri 32 karakteri geçmez",
+    "FastAPI veritabanı dependency override'ları ortak pytest fixture'ı üzerinden yapılır",
+    "HTTP JSON yanıtları UUID/tarih gibi tiplerle karşılaştırılmadan önce typed response model ile doğrulanır",
 )
 
 
