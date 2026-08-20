@@ -26,9 +26,26 @@ Her PR için, kapsam uygunsa:
 
 - Migration `upgrade -> downgrade -> upgrade` round-trip testinden geçmelidir.
 - Alembic metadata drift kontrolü PASS olmalıdır.
+- Alembic revision kimliği en fazla 32 karakter olmalı ve migration history tek head kalmalıdır.
+- Beklenen uygulama tablo seti elle güncellenen sabit liste olmamalı; SQLAlchemy metadata'dan türetilmelidir.
 - Çapraz-tenant okuma uygulama seviyesinde fail-closed test edilmelidir.
 - Çapraz-tenant foreign-key/ownership ilişkileri veritabanı seviyesinde reddedilmelidir.
 - Testler gerçek PostgreSQL üzerinde çalışmalıdır.
+
+## HTTP/API integration testlerinde ek kapılar
+
+- FastAPI veritabanı dependency override'ları ortak transaction-bound pytest fixture'ı üzerinden yapılmalıdır.
+- Generator dependency, `lambda: generator()` biçiminde generator nesnesi döndürecek şekilde override edilmemelidir.
+- HTTP JSON yanıtları UUID, tarih ve benzeri typed alanlarla karşılaştırılmadan önce Pydantic response model ile parse edilmelidir.
+- Yetkilendirme testleri authentication, membership, role ve cross-tenant sınırlarını ayrı ayrı kapsamalıdır.
+- Liste endpoint'leri sınırsız sonuç döndürmemeli; server-side üst sınırla pagination uygulamalıdır.
+
+## CI çalışma disiplini
+
+- GitHub Actions aynı PR/ref için `cancel-in-progress: true` kullanır; eski run'lar son head'in önüne geçmemelidir.
+- Birbirine bağlı çoklu dosya değişiklikleri mümkün olduğunda tek bütünlüklü committe hazırlanır; her dosya için ayrı CI run tetiklemekten kaçınılır.
+- CI kırıldığında hata mesajı/traceback kök nedene kadar okunur; yalnız semptomu kapatan eşik gevşetmesi veya skip eklenmez.
+- Aynı hata sınıfı ikinci kez ortaya çıkabilecekse regression guard veya ortak fixture/helper eklenmeden iş tamamlanmış sayılmaz.
 
 ## PR boyutu ve merge sırası
 

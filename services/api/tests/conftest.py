@@ -1,4 +1,4 @@
-"""Database fixtures for PostgreSQL integration tests."""
+"""Database and FastAPI fixtures for PostgreSQL integration tests."""
 
 from __future__ import annotations
 
@@ -61,3 +61,25 @@ def db_session(db_engine: Engine) -> Iterator[Session]:
         if transaction.is_active:
             transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def app_db_session(db_session: Session) -> Iterator[Session]:
+    """Bind FastAPI database dependencies to the real PostgreSQL test transaction.
+
+    Keeping this override in one fixture prevents tests from accidentally injecting
+    a generator object (for example via ``lambda: generator()``) instead of letting
+    FastAPI drive the generator dependency protocol itself.
+    """
+
+    from app.http_dependencies import get_database_session
+    from app.main import app
+
+    def override_database() -> Iterator[Session]:
+        yield db_session
+
+    app.dependency_overrides[get_database_session] = override_database
+    try:
+        yield db_session
+    finally:
+        app.dependency_overrides.pop(get_database_session, None)

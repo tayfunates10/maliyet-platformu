@@ -33,6 +33,7 @@ E-ticaret bir NACE sektörü gibi modellenmez; satış kanalı/operasyon modeli 
 - Tüm zorunlu CI kapıları yeşilse PR squash merge ile `main`e alınır.
 - Merge sonrası sıradaki PR yeniden güncel `main` dalından açılır.
 - CI, migration veya güvenlik kapılarından biri kırmızıysa merge yapılmaz.
+- Aynı PR için art arda gelen değişiklikler mümkün olduğunca tek, bütünlüklü committe toplanır; eski CI run'larının gereksiz kuyruk oluşturmasına izin verilmez.
 
 ## 5. PR teslim raporu
 
@@ -59,6 +60,10 @@ Her PR açıklaması en az şunları içerir:
 - Financial rounding açık bir politika ile uygulanır; çağıranın rastgele `round()` kullanmasına izin verilmez.
 - Tenant-owned tablo ilişkileri yalnız uygulama filtresine bırakılmaz; mümkün olduğunda veritabanı constraint'leri ile de korunur.
 - Migration dosyaları geri alınabilir olmalı ve model metadata'sı ile drift testinden geçmelidir.
+- Alembic revision kimlikleri 32 karakteri geçmez; migration history tek head olarak kalır.
+- Migration beklenen tablo listesi elle kopyalanmaz; SQLAlchemy metadata'dan türetilir.
+- FastAPI veritabanı dependency override'ları ortak pytest fixture'ı üzerinden yapılır; generator nesnesi doğrudan dependency sonucu olarak döndürülmez.
+- HTTP JSON yanıtları UUID/tarih gibi tiplerle karşılaştırılmadan önce typed response model ile doğrulanır.
 
 ## 7. Devralma sırası
 
