@@ -20,8 +20,10 @@ from app.organization_onboarding import (
     get_organization_access,
     list_organization_access,
 )
+from app.tax_profile_api import router as tax_profile_router
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
+router.include_router(tax_profile_router)
 
 
 class OrganizationCreateRequest(BaseModel):
