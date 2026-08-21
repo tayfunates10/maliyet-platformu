@@ -24,6 +24,9 @@ E-ticaret bir NACE sektörü gibi modellenmez; satış kanalı/operasyon modeli 
 - Parolalar plaintext, reversible encryption veya hızlı genel amaçlı hash ile saklanmaz; versioned memory-hard password hashing zorunludur.
 - Raw bearer/session token veritabanında saklanmaz.
 - Organization bootstrap sırasında owner/creator/role kimliği request body'den seçilemez; ilk owner authenticated server identity'dir.
+- TaxProfile vergi oranı, parasal eşik veya formül kaynağı değildir; bunlar yalnız versioned rules engine'den gelir.
+- Mevcut TaxProfile `entity_type` değeri kanuni şirket türü taksonomisi olarak yorumlanamaz; yalnız beyan edilmiş uygulama bağlamıdır.
+- TaxProfile yazma yetkisi yalnız authenticated `owner` ve `admin` rollerine aittir.
 - Bir PR'ın amacı başka bir PR'ın kapsamını gizlice genişletmemelidir.
 - CI kırmızıysa iş tamamlandı olarak raporlanmaz.
 
@@ -72,6 +75,8 @@ Her PR açıklaması en az şunları içerir:
 - Kimlik doğrulama hataları kullanıcı varlığını ifşa edecek farklı hata metinleri döndürmez.
 - Logout caller'dan session ID kabul etmez; yalnız authenticated bearer'dan çözülen current-session ID revoke edilir.
 - Tenant bootstrap transaction'ı organization + owner membership + zorunlu ilk profil + audit event tamamlanmadan başarılı sayılmaz.
+- TaxProfile create/update işlemi profil mutasyonu ve audit event tamamlanmadan başarılı sayılmaz.
+- `tax_rate`, bracket, threshold veya actor/role override alanları TaxProfile HTTP payload'ına eklenemez.
 
 ## 7. Devralma sırası
 
