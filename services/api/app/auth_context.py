@@ -61,6 +61,7 @@ class AuthenticatedIdentity:
     """Identity established exclusively from a valid server-side session."""
 
     user_id: UUID
+    auth_session_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -87,11 +88,7 @@ def issue_session(
     ttl: timedelta = DEFAULT_SESSION_TTL,
     now: datetime | None = None,
 ) -> tuple[AuthSession, str]:
-    """Issue a high-entropy opaque token for a known active user.
-
-    This is an internal primitive for the future login/SSO flow; it is not
-    exposed as an unauthenticated HTTP endpoint in this stage.
-    """
+    """Issue a high-entropy opaque token for a known active user."""
 
     issued_at = now or _now_utc()
     if issued_at.tzinfo is None:
@@ -130,6 +127,22 @@ def revoke_session(
         session.flush()
 
 
+def revoke_authenticated_session(
+    session: Session,
+    *,
+    identity: AuthenticatedIdentity,
+    now: datetime | None = None,
+) -> None:
+    """Revoke exactly the bearer session that authenticated the current request."""
+
+    if identity.auth_session_id is None:
+        raise AuthenticationError("authenticated session id missing")
+    auth_session = session.get(AuthSession, identity.auth_session_id)
+    if auth_session is None or auth_session.user_id != identity.user_id:
+        raise AuthenticationError("invalid session")
+    revoke_session(session, auth_session=auth_session, now=now)
+
+
 def authenticate_session(
     session: Session,
     *,
@@ -145,7 +158,7 @@ def authenticate_session(
         raise AuthenticationError("invalid session")
 
     row = session.execute(
-        select(AuthSession.user_id)
+        select(AuthSession.id, AuthSession.user_id)
         .join(User, User.id == AuthSession.user_id)
         .where(
             AuthSession.token_sha256 == _token_digest(raw_token),
@@ -156,7 +169,7 @@ def authenticate_session(
     ).one_or_none()
     if row is None:
         raise AuthenticationError("invalid session")
-    return AuthenticatedIdentity(user_id=row[0])
+    return AuthenticatedIdentity(user_id=row[1], auth_session_id=row[0])
 
 
 def resolve_actor_context(

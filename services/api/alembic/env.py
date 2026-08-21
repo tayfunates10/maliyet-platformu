@@ -7,7 +7,9 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from app.auth_context import AuthSession
 from app.models import Base
+from app.password_auth import UserCredential
 from app.rules_models import RuleDefinition, RuleSource, RuleVersion
 
 config = context.config
@@ -15,7 +17,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-REGISTERED_RULE_MODELS = (RuleDefinition, RuleSource, RuleVersion)
+REGISTERED_AUXILIARY_MODELS = (
+    RuleDefinition,
+    RuleSource,
+    RuleVersion,
+    AuthSession,
+    UserCredential,
+)
 target_metadata = Base.metadata
 
 

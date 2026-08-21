@@ -32,6 +32,18 @@ Her PR için, kapsam uygunsa:
 - Çapraz-tenant foreign-key/ownership ilişkileri veritabanı seviyesinde reddedilmelidir.
 - Testler gerçek PostgreSQL üzerinde çalışmalıdır.
 
+## Authentication değişikliklerinde ek kapılar
+
+- Parola plaintext, reversible encryption veya SHA/MD5 gibi hızlı genel amaçlı hash ile saklanamaz; versioned memory-hard KDF zorunludur.
+- Aynı parola iki kez hash edildiğinde farklı salt nedeniyle farklı encoded hash üretilmesi test edilmelidir.
+- Raw bearer/session token kalıcı storage'a yazılamaz.
+- Unknown-user, yanlış parola ve lockout durumları aynı genel authentication hatasını kullanmalıdır.
+- Başarısız giriş sayacı/lockout state'i 401 dönerken transaction rollback ile kaybolmamalıdır.
+- Concurrent failed-attempt güncellemeleri account row lock veya eşdeğer atomik mekanizma ile korunmalıdır.
+- Logout yalnız authenticated current-session kimliğini revoke etmelidir; caller session ID seçememelidir.
+- Token dönen response'lar `Cache-Control: no-store` taşımalıdır.
+- Registration/login payload'larında parola whitespace'i global trim/normalize işlemine tabi tutulmamalıdır.
+
 ## HTTP/API integration testlerinde ek kapılar
 
 - FastAPI veritabanı dependency override'ları ortak transaction-bound pytest fixture'ı üzerinden yapılmalıdır.
