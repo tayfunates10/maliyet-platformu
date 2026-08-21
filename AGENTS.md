@@ -21,6 +21,8 @@ E-ticaret bir NACE sektörü gibi modellenmez; satış kanalı/operasyon modeli 
 - Hesaplama sonucu; giriş snapshot'ı, kural snapshot'ı ve motor sürümü ile audit edilebilir olmalıdır.
 - Tenant izolasyonu güvenlik sınırıdır; organizasyonlar arası veri sızıntısı kabul edilemez.
 - Public/widget sonucu, işletme içi gerçek maliyet detaylarını varsayılan olarak içermez.
+- Parolalar plaintext, reversible encryption veya hızlı genel amaçlı hash ile saklanmaz; versioned memory-hard password hashing zorunludur.
+- Raw bearer/session token veritabanında saklanmaz.
 - Bir PR'ın amacı başka bir PR'ın kapsamını gizlice genişletmemelidir.
 - CI kırmızıysa iş tamamlandı olarak raporlanmaz.
 
@@ -64,6 +66,10 @@ Her PR açıklaması en az şunları içerir:
 - Migration beklenen tablo listesi elle kopyalanmaz; SQLAlchemy metadata'dan türetilir.
 - FastAPI veritabanı dependency override'ları ortak pytest fixture'ı üzerinden yapılır; generator nesnesi doğrudan dependency sonucu olarak döndürülmez.
 - HTTP JSON yanıtları UUID/tarih gibi tiplerle karşılaştırılmadan önce typed response model ile doğrulanır.
+- Parola alanına global whitespace trim uygulanmaz; kullanıcının girdiği parola byte dizisi doğrulama ve hash sırasında korunur.
+- Başarısız giriş/lockout sayaçları güvenlik state'idir; 401 üretirken request rollback ile kaybolmalarına izin verilmez.
+- Kimlik doğrulama hataları kullanıcı varlığını ifşa edecek farklı hata metinleri döndürmez.
+- Logout caller'dan session ID kabul etmez; yalnız authenticated bearer'dan çözülen current-session ID revoke edilir.
 
 ## 7. Devralma sırası
 

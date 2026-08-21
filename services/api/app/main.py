@@ -4,17 +4,22 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Query, status
+from fastapi import Body, Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth_context import (
     ActorContext,
     AuthenticatedIdentity,
+    AuthenticationError,
     AuthorizationError,
+    issue_session,
     require_calculation_write,
     resolve_actor_context,
+    revoke_authenticated_session,
 )
 from app.calculation_orchestration import CalculationOrchestrationError
 from app.engine_registry import (
@@ -25,7 +30,16 @@ from app.engine_registry import (
     list_registered_engines,
 )
 from app.http_dependencies import get_authenticated_identity, get_database_session
-from app.models import AuditEvent, Calculation, CalculationVersion
+from app.models import AuditEvent, Calculation, CalculationVersion, User
+from app.password_auth import (
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_MIN_LENGTH,
+    PasswordAuthenticationError,
+    authenticate_password_and_issue_session,
+    create_password_credential,
+    normalize_email,
+    validate_password,
+)
 from app.tenancy import TenantResourceNotFound
 
 SERVICE_NAME = "maliyet-calculation-api"
@@ -58,6 +72,49 @@ class EngineDetail(EngineCatalogItem):
     """Engine catalog item plus strict JSON input schema."""
 
     input_schema: dict[str, object]
+
+
+class RegisterRequest(BaseModel):
+    """Strict local-password registration payload.
+
+    Password whitespace is intentionally preserved exactly as supplied.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(min_length=3, max_length=320)
+    display_name: str = Field(min_length=1, max_length=160)
+    password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
+
+
+class LoginRequest(BaseModel):
+    """Bounded login payload; authentication errors intentionally remain generic."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
+
+
+class SessionTokenResponse(BaseModel):
+    """Opaque bearer token returned only at issuance time."""
+
+    model_config = ConfigDict(frozen=True)
+
+    token_type: Literal["bearer"]
+    access_token: str
+    expires_at: datetime
+    user_id: UUID
+
+
+class CurrentUserResponse(BaseModel):
+    """Authenticated user's non-secret profile."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    email: str
+    display_name: str
 
 
 class CalculationCreateRequest(BaseModel):
@@ -198,11 +255,155 @@ def _calculation_version_response(version: CalculationVersion) -> CalculationVer
     )
 
 
+def _session_token_response(
+    *,
+    user: User,
+    raw_token: str,
+    expires_at: datetime,
+) -> SessionTokenResponse:
+    return SessionTokenResponse(
+        token_type="bearer",
+        access_token=raw_token,
+        expires_at=expires_at,
+        user_id=user.id,
+    )
+
+
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 def health() -> HealthResponse:
     """Return a dependency-free process health signal."""
 
     return HealthResponse(status="ok", service=SERVICE_NAME, version=SERVICE_VERSION)
+
+
+@app.post(
+    "/auth/register",
+    response_model=SessionTokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["auth"],
+)
+def register(
+    payload: RegisterRequest,
+    response: Response,
+    session: Annotated[Session, Depends(get_database_session)],
+) -> SessionTokenResponse:
+    """Create a local-password user and immediately issue an opaque session."""
+
+    try:
+        email = normalize_email(payload.email)
+        validate_password(payload.password)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    display_name = payload.display_name.strip()
+    if not display_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="display name is required",
+        )
+
+    if session.scalar(select(User.id).where(User.email == email)) is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="account already exists")
+
+    try:
+        with session.begin_nested():
+            user = User(email=email, display_name=display_name)
+            session.add(user)
+            session.flush()
+            create_password_credential(session, user_id=user.id, password=payload.password)
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="account already exists",
+        ) from exc
+
+    auth_session, raw_token = issue_session(session, user_id=user.id)
+    response.headers["Cache-Control"] = "no-store"
+    return _session_token_response(
+        user=user,
+        raw_token=raw_token,
+        expires_at=auth_session.expires_at,
+    )
+
+
+@app.post(
+    "/auth/login",
+    response_model=SessionTokenResponse,
+    tags=["auth"],
+    responses={401: {"description": "Invalid credentials"}},
+)
+def login(
+    payload: LoginRequest,
+    response: Response,
+    session: Annotated[Session, Depends(get_database_session)],
+) -> SessionTokenResponse | Response:
+    """Authenticate local credentials and persist failed-attempt state on 401 responses."""
+
+    try:
+        user, auth_session, raw_token = authenticate_password_and_issue_session(
+            session,
+            email=payload.email,
+            password=payload.password,
+        )
+    except PasswordAuthenticationError, ValueError:
+        # Return rather than raise so failed-attempt/lockout state is committed.
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": "invalid credentials"},
+            headers={"WWW-Authenticate": "Bearer", "Cache-Control": "no-store"},
+        )
+
+    response.headers["Cache-Control"] = "no-store"
+    return _session_token_response(
+        user=user,
+        raw_token=raw_token,
+        expires_at=auth_session.expires_at,
+    )
+
+
+@app.get("/auth/me", response_model=CurrentUserResponse, tags=["auth"])
+def current_user(
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    session: Annotated[Session, Depends(get_database_session)],
+) -> CurrentUserResponse:
+    """Return the active user authenticated by the current opaque bearer session."""
+
+    active_user_query = select(User).where(
+        User.id == identity.user_id,
+        User.is_active.is_(True),
+    )
+    user = session.scalar(active_user_query)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="authentication required",
+        )
+    return CurrentUserResponse(id=user.id, email=user.email, display_name=user.display_name)
+
+
+@app.post(
+    "/auth/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    tags=["auth"],
+)
+def logout(
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    session: Annotated[Session, Depends(get_database_session)],
+) -> Response:
+    """Revoke exactly the opaque bearer session used for this request."""
+
+    try:
+        revoke_authenticated_session(session, identity=identity)
+    except AuthenticationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="authentication required",
+        ) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get("/engines", response_model=list[EngineCatalogItem], tags=["engines"])
