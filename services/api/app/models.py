@@ -8,6 +8,7 @@ application code.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -19,6 +20,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    Numeric,
     String,
     UniqueConstraint,
     Uuid,
@@ -199,6 +201,11 @@ class CalculationVersion(UUIDPrimaryKeyMixin, Base):
             "version",
             name="uq_calculation_version",
         ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            name="uq_calculation_version_id_org",
+        ),
         ForeignKeyConstraint(
             ["calculation_id", "organization_id"],
             ["calculations.id", "calculations.organization_id"],
@@ -246,6 +253,63 @@ class CalculationVersion(UUIDPrimaryKeyMixin, Base):
     ruleset_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     output_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     output_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class PublicCalculationProjection(UUIDPrimaryKeyMixin, Base):
+    """Immutable customer-safe publication linked to one tenant calculation version."""
+
+    __tablename__ = "public_calculation_projections"
+    __table_args__ = (
+        CheckConstraint(
+            "length(token_sha256) = 64",
+            name="ck_public_projection_token_sha256_length",
+        ),
+        CheckConstraint(
+            "length(currency) = 3 AND currency = upper(currency)",
+            name="ck_public_projection_currency",
+        ),
+        CheckConstraint(
+            "estimate_min >= 0",
+            name="ck_public_projection_estimate_min_non_negative",
+        ),
+        CheckConstraint(
+            "estimate_max >= estimate_min",
+            name="ck_public_projection_estimate_range",
+        ),
+        ForeignKeyConstraint(
+            ["calculation_version_id", "organization_id"],
+            ["calculation_versions.id", "calculation_versions.organization_id"],
+            name="fk_public_projection_version_tenant",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["organization_id", "created_by_user_id"],
+            [
+                "organization_memberships.organization_id",
+                "organization_memberships.user_id",
+            ],
+            name="fk_public_projection_creator_membership",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("token_sha256", name="uq_public_projection_token_sha256"),
+        Index("ix_public_projection_org_created", "organization_id", "created_at"),
+        Index("ix_public_projection_version", "calculation_version_id"),
+    )
+
+    organization_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    calculation_version_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    created_by_user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    token_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    estimate_min: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)
+    estimate_max: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
