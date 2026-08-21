@@ -31,6 +31,7 @@ from app.engine_registry import (
 )
 from app.http_dependencies import get_authenticated_identity, get_database_session
 from app.models import AuditEvent, Calculation, CalculationVersion, User
+from app.organization_api import router as organization_router
 from app.password_auth import (
     PASSWORD_MAX_LENGTH,
     PASSWORD_MIN_LENGTH,
@@ -182,6 +183,7 @@ app = FastAPI(
     version=SERVICE_VERSION,
     description="Versioned API for costing, finance and integration capabilities.",
 )
+app.include_router(organization_router)
 
 
 def _actor_for_organization(
@@ -349,7 +351,6 @@ def login(
             password=payload.password,
         )
     except PasswordAuthenticationError, ValueError:
-        # Return rather than raise so failed-attempt/lockout state is committed.
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"detail": "invalid credentials"},
