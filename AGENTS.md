@@ -23,6 +23,7 @@ E-ticaret bir NACE sektörü gibi modellenmez; satış kanalı/operasyon modeli 
 - Public/widget sonucu, işletme içi gerçek maliyet detaylarını varsayılan olarak içermez.
 - Parolalar plaintext, reversible encryption veya hızlı genel amaçlı hash ile saklanmaz; versioned memory-hard password hashing zorunludur.
 - Raw bearer/session token veritabanında saklanmaz.
+- Organization bootstrap sırasında owner/creator/role kimliği request body'den seçilemez; ilk owner authenticated server identity'dir.
 - Bir PR'ın amacı başka bir PR'ın kapsamını gizlice genişletmemelidir.
 - CI kırmızıysa iş tamamlandı olarak raporlanmaz.
 
@@ -70,6 +71,7 @@ Her PR açıklaması en az şunları içerir:
 - Başarısız giriş/lockout sayaçları güvenlik state'idir; 401 üretirken request rollback ile kaybolmalarına izin verilmez.
 - Kimlik doğrulama hataları kullanıcı varlığını ifşa edecek farklı hata metinleri döndürmez.
 - Logout caller'dan session ID kabul etmez; yalnız authenticated bearer'dan çözülen current-session ID revoke edilir.
+- Tenant bootstrap transaction'ı organization + owner membership + zorunlu ilk profil + audit event tamamlanmadan başarılı sayılmaz.
 
 ## 7. Devralma sırası
 
