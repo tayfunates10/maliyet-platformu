@@ -21,6 +21,9 @@ E-ticaret bir NACE sektörü gibi modellenmez; satış kanalı/operasyon modeli 
 - Hesaplama sonucu; giriş snapshot'ı, kural snapshot'ı ve motor sürümü ile audit edilebilir olmalıdır.
 - Tenant izolasyonu güvenlik sınırıdır; organizasyonlar arası veri sızıntısı kabul edilemez.
 - Public/widget sonucu, işletme içi gerçek maliyet detaylarını varsayılan olarak içermez.
+- Public projection hiçbir zaman internal `input_snapshot`, `ruleset_snapshot`, `output_snapshot`, maliyet, kâr veya marj alanlarını otomatik olarak yayınlayamaz; response explicit allowlist olmak zorundadır.
+- Public share token raw olarak veritabanında saklanmaz; yalnız güçlü digest saklanır ve revoke sonrası public erişim fail-closed olmalıdır.
+- Public projection oluşturma/revoke yetkisi yalnız authenticated `owner` ve `admin` rollerine aittir.
 - Parolalar plaintext, reversible encryption veya hızlı genel amaçlı hash ile saklanmaz; versioned memory-hard password hashing zorunludur.
 - Raw bearer/session token veritabanında saklanmaz.
 - Organization bootstrap sırasında owner/creator/role kimliği request body'den seçilemez; ilk owner authenticated server identity'dir.
@@ -77,6 +80,8 @@ Her PR açıklaması en az şunları içerir:
 - Tenant bootstrap transaction'ı organization + owner membership + zorunlu ilk profil + audit event tamamlanmadan başarılı sayılmaz.
 - TaxProfile create/update işlemi profil mutasyonu ve audit event tamamlanmadan başarılı sayılmaz.
 - `tax_rate`, bracket, threshold veya actor/role override alanları TaxProfile HTTP payload'ına eklenemez.
+- Public projection kaynağı provenance digest'leri tamamlanmış immutable CalculationVersion olmak zorundadır.
+- Public projection immutable'dır; müşteri görünür sonucu değiştirmek için yeni projection oluşturulur, eski projection yalnız revoke edilir.
 
 ## 7. Devralma sırası
 
