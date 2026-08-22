@@ -235,9 +235,7 @@ def test_profile_update_does_not_change_public_snapshot_until_republish(
     assert first_payload["presentation"]["light_background_color"] == "#112233"
     assert first_payload["presentation"]["border_radius_px"] == 8
     usage = app_db_session.scalar(
-        select(WidgetUsageBucket).where(
-            WidgetUsageBucket.widget_deployment_id == deployment.id
-        )
+        select(WidgetUsageBucket).where(WidgetUsageBucket.widget_deployment_id == deployment.id)
     )
     assert usage is not None
     assert usage.request_count == 1
