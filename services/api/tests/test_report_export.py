@@ -78,7 +78,12 @@ def _trade_payload() -> dict[str, object]:
 
 
 def test_csv_export_is_deterministic_decimal_safe_and_formula_safe() -> None:
-    calculation = SimpleNamespace(id="calc-1", organization_id="org-1", name="=SUM(A1:A2)", calculation_type="trade")
+    calculation = SimpleNamespace(
+        id="calc-1",
+        organization_id="org-1",
+        name="=SUM(A1:A2)",
+        calculation_type="trade",
+    )
     version = SimpleNamespace(
         calculation_id="calc-1",
         organization_id="org-1",
