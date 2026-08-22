@@ -16,6 +16,10 @@ from sqlalchemy.orm import Session
 from app.auth_context import AuthenticatedIdentity
 from app.http_dependencies import get_authenticated_identity, get_database_session
 from app.models import PublicCalculationProjection, WidgetAllowedOrigin, WidgetDeployment
+from app.widget_branding import (
+    WidgetPresentationPublication,
+    get_published_widget_presentation,
+)
 from app.widget_security import (
     WidgetAccessDenied,
     WidgetDeploymentNotFound,
@@ -76,6 +80,27 @@ class WidgetDeploymentResponse(BaseModel):
     allowed_origins: list[WidgetAllowedOriginResponse]
 
 
+class WidgetPublicPresentationResponse(BaseModel):
+    """Public allowlisted presentation copied from an immutable published snapshot."""
+
+    model_config = ConfigDict(frozen=True)
+
+    theme: str
+    locale: str
+    density: str
+    show_title: bool
+    light_background_color: str
+    light_text_color: str
+    light_border_color: str
+    dark_background_color: str
+    dark_text_color: str
+    dark_border_color: str
+    error_color: str
+    border_radius_px: int
+    font_family: str
+    published_at: datetime
+
+
 class WidgetProjectionResponse(BaseModel):
     """Browser response containing only customer-safe publication fields."""
 
@@ -86,6 +111,7 @@ class WidgetProjectionResponse(BaseModel):
     estimate_min: str
     estimate_max: str
     published_at: datetime
+    presentation: WidgetPublicPresentationResponse | None = None
 
 
 def _amount_text(value: Decimal | str) -> str:
@@ -126,13 +152,42 @@ def _deployment_response(
     )
 
 
-def _projection_response(projection: PublicCalculationProjection) -> WidgetProjectionResponse:
+def _presentation_response(
+    publication: WidgetPresentationPublication | None,
+) -> WidgetPublicPresentationResponse | None:
+    if publication is None:
+        return None
+    snapshot = publication.snapshot
+    return WidgetPublicPresentationResponse(
+        theme=snapshot.theme,
+        locale=snapshot.locale,
+        density=snapshot.density,
+        show_title=snapshot.show_title,
+        light_background_color=snapshot.light_background_color,
+        light_text_color=snapshot.light_text_color,
+        light_border_color=snapshot.light_border_color,
+        dark_background_color=snapshot.dark_background_color,
+        dark_text_color=snapshot.dark_text_color,
+        dark_border_color=snapshot.dark_border_color,
+        error_color=snapshot.error_color,
+        border_radius_px=snapshot.border_radius_px,
+        font_family=snapshot.font_family,
+        published_at=publication.published_at,
+    )
+
+
+def _projection_response(
+    projection: PublicCalculationProjection,
+    *,
+    presentation: WidgetPresentationPublication | None,
+) -> WidgetProjectionResponse:
     return WidgetProjectionResponse(
         title=projection.title,
         currency=projection.currency,
         estimate_min=_amount_text(projection.estimate_min),
         estimate_max=_amount_text(projection.estimate_max),
         published_at=projection.created_at,
+        presentation=_presentation_response(presentation),
     )
 
 
@@ -257,7 +312,11 @@ def disable_widget_deployment_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@public_router.get("/{deployment_id}/projection", response_model=WidgetProjectionResponse)
+@public_router.get(
+    "/{deployment_id}/projection",
+    response_model=WidgetProjectionResponse,
+    response_model_exclude_none=True,
+)
 def consume_widget_projection_endpoint(
     deployment_id: UUID,
     response: Response,
@@ -301,4 +360,10 @@ def consume_widget_projection_endpoint(
     response.headers["X-RateLimit-Limit"] = str(consumption.request_limit)
     response.headers["X-RateLimit-Remaining"] = str(consumption.remaining)
     response.headers["X-RateLimit-Reset"] = str(int(consumption.reset_at.timestamp()))
-    return _projection_response(consumption.projection)
+    return _projection_response(
+        consumption.projection,
+        presentation=get_published_widget_presentation(
+            session,
+            deployment_id=deployment_id,
+        ),
+    )
