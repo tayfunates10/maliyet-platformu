@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth_context import AuthenticatedIdentity, AuthorizationError, resolve_actor_context
-from app.models import AuditEvent, WidgetDeployment
+from app.models import AuditEvent, PublicCalculationProjection, WidgetDeployment
 from app.widget_branding_models import (
     WidgetBrandingProfile,
     WidgetPresentationSnapshot,
@@ -408,6 +408,17 @@ def publish_widget_presentation(
         .with_for_update()
     )
     if deployment is None:
+        raise WidgetDeploymentNotFound("widget deployment not found")
+    projection_id = session.scalar(
+        select(PublicCalculationProjection.id)
+        .where(
+            PublicCalculationProjection.id == deployment.public_projection_id,
+            PublicCalculationProjection.organization_id == organization_id,
+            PublicCalculationProjection.revoked_at.is_(None),
+        )
+        .with_for_update()
+    )
+    if projection_id is None:
         raise WidgetDeploymentNotFound("widget deployment not found")
 
     profile = _tenant_profile_for_update(
