@@ -11,6 +11,11 @@ from app.auth_context import AuthSession
 from app.models import Base
 from app.password_auth import UserCredential
 from app.rules_models import RuleDefinition, RuleSource, RuleVersion
+from app.widget_branding_models import (
+    WidgetBrandingProfile,
+    WidgetPresentationSnapshot,
+    WidgetPublishedPresentation,
+)
 
 config = context.config
 
@@ -23,6 +28,9 @@ REGISTERED_AUXILIARY_MODELS = (
     RuleVersion,
     AuthSession,
     UserCredential,
+    WidgetBrandingProfile,
+    WidgetPresentationSnapshot,
+    WidgetPublishedPresentation,
 )
 target_metadata = Base.metadata
 
