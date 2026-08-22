@@ -297,6 +297,7 @@ class PublicCalculationProjection(UUIDPrimaryKeyMixin, Base):
             ondelete="RESTRICT",
         ),
         UniqueConstraint("token_sha256", name="uq_public_projection_token_sha256"),
+        UniqueConstraint("id", "organization_id", name="uq_public_projection_id_org"),
         Index("ix_public_projection_org_created", "organization_id", "created_at"),
         Index("ix_public_projection_version", "calculation_version_id"),
     )
@@ -310,6 +311,122 @@ class PublicCalculationProjection(UUIDPrimaryKeyMixin, Base):
     estimate_min: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)
     estimate_max: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class WidgetDeployment(UUIDPrimaryKeyMixin, Base):
+    """Public widget identifier bound to one already-safe projection and tenant."""
+
+    __tablename__ = "widget_deployments"
+    __table_args__ = (
+        CheckConstraint(
+            "hourly_request_limit >= 1 AND hourly_request_limit <= 100000",
+            name="ck_widget_deployment_hourly_limit",
+        ),
+        ForeignKeyConstraint(
+            ["public_projection_id", "organization_id"],
+            ["public_calculation_projections.id", "public_calculation_projections.organization_id"],
+            name="fk_widget_deployment_projection_tenant",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["organization_id", "created_by_user_id"],
+            [
+                "organization_memberships.organization_id",
+                "organization_memberships.user_id",
+            ],
+            name="fk_widget_deployment_creator_membership",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("id", "organization_id", name="uq_widget_deployment_id_org"),
+        Index("ix_widget_deployment_org_created", "organization_id", "created_at"),
+        Index("ix_widget_deployment_projection", "public_projection_id"),
+    )
+
+    organization_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    public_projection_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    created_by_user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    hourly_request_limit: Mapped[int] = mapped_column(Integer, nullable=False)
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class WidgetAllowedOrigin(UUIDPrimaryKeyMixin, Base):
+    """Exact normalized HTTPS origin allowed to consume one widget deployment."""
+
+    __tablename__ = "widget_allowed_origins"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["widget_deployment_id", "organization_id"],
+            ["widget_deployments.id", "widget_deployments.organization_id"],
+            name="fk_widget_origin_deployment_tenant",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["organization_id", "created_by_user_id"],
+            [
+                "organization_memberships.organization_id",
+                "organization_memberships.user_id",
+            ],
+            name="fk_widget_origin_creator_membership",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint(
+            "widget_deployment_id",
+            "origin",
+            name="uq_widget_origin_deployment_origin",
+        ),
+        Index(
+            "ix_widget_origin_org_deployment",
+            "organization_id",
+            "widget_deployment_id",
+        ),
+    )
+
+    organization_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    widget_deployment_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    created_by_user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    origin: Mapped[str] = mapped_column(String(512), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class WidgetUsageBucket(UUIDPrimaryKeyMixin, Base):
+    """Atomic per-deployment UTC-hour request counter used for quota enforcement."""
+
+    __tablename__ = "widget_usage_buckets"
+    __table_args__ = (
+        CheckConstraint("request_count >= 0", name="ck_widget_usage_request_count"),
+        ForeignKeyConstraint(
+            ["widget_deployment_id", "organization_id"],
+            ["widget_deployments.id", "widget_deployments.organization_id"],
+            name="fk_widget_usage_deployment_tenant",
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint(
+            "widget_deployment_id",
+            "bucket_start",
+            name="uq_widget_usage_deployment_start",
+        ),
+        Index("ix_widget_usage_org_bucket", "organization_id", "bucket_start"),
+    )
+
+    organization_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    widget_deployment_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    bucket_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
