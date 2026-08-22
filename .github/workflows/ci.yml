@@ -85,5 +85,7 @@ jobs:
         run: npm run lint
       - name: TypeScript 7 CLI
         run: npm run typecheck
+      - name: Widget SDK integration contract
+        run: npm run widget:test
       - name: Next.js build
         run: npm run build
