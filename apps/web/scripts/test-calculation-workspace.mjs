@@ -15,12 +15,18 @@ for (const source of [apiClient, workspace, proxy]) {
 }
 
 assert.match(apiClient, /const MANAGEMENT_PREFIX = "\/api\/management"/);
+assert.match(apiClient, /const ORGANIZATION_PAGE_SIZE = 50/);
+assert.match(apiClient, /const CALCULATION_PAGE_SIZE = 50/);
 assert.match(apiClient, /credentials:\s*"omit"/);
 assert.match(apiClient, /cache:\s*"no-store"/);
 assert.match(apiClient, /redirect:\s*"error"/);
 assert.match(apiClient, /referrerPolicy:\s*"no-referrer"/);
-assert.match(apiClient, /headers\.set\("Authorization", `Bearer \$\{options\.token\}`\)/);
+assert.match(apiClient, /Authorization: `Bearer \$\{token\}`/);
+assert.match(apiClient, /logoutWorkspace/);
+assert.match(apiClient, /MANAGEMENT_PREFIX\}\/auth\/logout/);
+assert.match(apiClient, /response\.status !== 204/);
 assert.match(apiClient, /listWorkspaceOrganizations/);
+assert.match(apiClient, /organization_page_limit_exceeded/);
 assert.match(apiClient, /listWorkspaceEngines/);
 assert.match(apiClient, /listCalculations/);
 assert.match(apiClient, /createCalculation/);
@@ -28,9 +34,13 @@ assert.match(apiClient, /calculation\.organization_id !== organizationId/);
 assert.match(apiClient, /seenIds/);
 assert.doesNotMatch(apiClient, /fetch\(\s*["'`]https?:\/\//);
 
+assert.match(proxy, /\^auth\\\/logout\$/);
+assert.match(proxy, /\^organizations\$/);
 assert.match(proxy, /\^engines\$/);
 assert.match(proxy, /organizations\/\$\{UUID\}\/calculations/);
 assert.match(proxy, /allowDeploymentPagination:\s*true/);
+assert.match(proxy, /allowEmptyBody:\s*true/);
+assert.match(proxy, /upstream\.status === 204/);
 assert.match(proxy, /authorization\.startsWith\("Bearer "\)/);
 assert.doesNotMatch(proxy, /Access-Control-Allow-Origin/);
 
@@ -41,6 +51,8 @@ assert.match(workspace, /Promise\.all/);
 assert.match(workspace, /WRITE_ROLES/);
 assert.match(workspace, /listCalculations/);
 assert.match(workspace, /createCalculation/);
+assert.match(workspace, /await logoutWorkspace\(token\)/);
+assert.match(workspace, /Oturumu kapat/);
 assert.doesNotMatch(workspace, /useEffect/);
 assert.doesNotMatch(workspace, /\{token\}/);
 
