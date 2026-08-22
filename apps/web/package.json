@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "contract": "node scripts/check-contract.mjs",
     "widget:test": "node scripts/test-widget-loader.mjs && node scripts/test-widget-theme-config.mjs && node scripts/test-widget-published-branding.mjs",
-    "management:test": "node scripts/test-widget-branding-management.mjs"
+    "management:test": "node scripts/test-widget-branding-management.mjs",
+    "calculation:test": "node scripts/test-calculation-workspace.mjs"
   },
   "dependencies": {
     "next": "16.3.0",
