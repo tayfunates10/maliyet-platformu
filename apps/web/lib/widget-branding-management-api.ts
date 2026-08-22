@@ -22,6 +22,18 @@ export type OrganizationSummary = Readonly<{
   city: string | null;
 }>;
 
+export type WidgetDeploymentSummary = Readonly<{
+  id: string;
+  public_projection_id: string;
+  name: string;
+  hourly_request_limit: number;
+  disabled_at: string | null;
+  source_revoked_at: string | null;
+  created_at: string;
+  allowed_origins: readonly string[];
+  publishable: boolean;
+}>;
+
 export type WidgetBrandingProfileInput = Readonly<{
   name: string;
   theme: WidgetTheme;
@@ -78,6 +90,14 @@ function requireNullableString(record: Record<string, unknown>, key: string): st
   const value = record[key];
   if (value === null) return null;
   if (typeof value !== "string") throw new ManagementApiError(502, "invalid_response");
+  return value;
+}
+
+function requireDateOrNull(record: Record<string, unknown>, key: string): string | null {
+  const value = requireNullableString(record, key);
+  if (value !== null && Number.isNaN(Date.parse(value))) {
+    throw new ManagementApiError(502, "invalid_response");
+  }
   return value;
 }
 
@@ -147,6 +167,43 @@ function parseOrganization(value: unknown): OrganizationSummary {
     primary_sector: requireNullableString(value, "primary_sector"),
     country_code: requireNullableString(value, "country_code"),
     city: requireNullableString(value, "city"),
+  });
+}
+
+function parseDeployment(value: unknown): WidgetDeploymentSummary {
+  if (!isRecord(value)) throw new ManagementApiError(502, "invalid_response");
+  const id = requireString(value, "id");
+  const projectionId = requireString(value, "public_projection_id");
+  const name = requireString(value, "name");
+  const createdAt = requireString(value, "created_at");
+  const requestLimit = value.hourly_request_limit;
+  const origins = value.allowed_origins;
+  const publishable = value.publishable;
+  if (
+    !UUID_PATTERN.test(id) ||
+    !UUID_PATTERN.test(projectionId) ||
+    name.length === 0 ||
+    typeof requestLimit !== "number" ||
+    !Number.isInteger(requestLimit) ||
+    requestLimit < 1 ||
+    requestLimit > 100000 ||
+    Number.isNaN(Date.parse(createdAt)) ||
+    !Array.isArray(origins) ||
+    origins.some((origin) => typeof origin !== "string" || !origin.startsWith("https://")) ||
+    typeof publishable !== "boolean"
+  ) {
+    throw new ManagementApiError(502, "invalid_response");
+  }
+  return Object.freeze({
+    id,
+    public_projection_id: projectionId,
+    name,
+    hourly_request_limit: requestLimit,
+    disabled_at: requireDateOrNull(value, "disabled_at"),
+    source_revoked_at: requireDateOrNull(value, "source_revoked_at"),
+    created_at: createdAt,
+    allowed_origins: Object.freeze([...origins]) as readonly string[],
+    publishable,
   });
 }
 
@@ -261,6 +318,20 @@ export async function listManagementOrganizations(
   const payload = await requestJson("/organizations", { token });
   if (!Array.isArray(payload)) throw new ManagementApiError(502, "invalid_response");
   return Object.freeze(payload.map(parseOrganization));
+}
+
+export async function listWidgetDeployments(
+  _apiBaseUrl: string,
+  token: string,
+  organizationId: string,
+): Promise<readonly WidgetDeploymentSummary[]> {
+  if (!UUID_PATTERN.test(organizationId)) throw new ManagementApiError(0, "invalid_organization");
+  const payload = await requestJson(
+    `/organizations/${encodeURIComponent(organizationId)}/widget-deployments`,
+    { token },
+  );
+  if (!Array.isArray(payload)) throw new ManagementApiError(502, "invalid_response");
+  return Object.freeze(payload.map(parseDeployment));
 }
 
 export async function listBrandingProfiles(
