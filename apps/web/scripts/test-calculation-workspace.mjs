@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { transitionNullableValue } from "../lib/schema-nullability.mjs";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const apiClient = readFileSync(resolve(webRoot, "lib/calculation-workspace-api.ts"), "utf8");
@@ -114,8 +115,31 @@ assert.match(schemaEditor, /resolved\.type === "array"/);
 assert.match(schemaEditor, /resolved\.type === "object"/);
 assert.match(schemaEditor, /enumValues/);
 assert.match(schemaEditor, /#\/\$defs\//);
+assert.match(schemaEditor, /allowsNull/);
+assert.match(schemaEditor, /transitionNullableValue/);
+assert.match(schemaEditor, /Bu alanı kullan/);
+assert.match(schemaEditor, /Object\.hasOwn\(recordValue, key\)/);
 assert.doesNotMatch(schemaEditor, /dangerouslySetInnerHTML|innerHTML|eval|Function\(/);
 assert.doesNotMatch(schemaEditor, /parseFloat|parseInt/);
+
+const retainedNullable = { capacity_quantity: "12.5" };
+assert.equal(
+  transitionNullableValue(false, retainedNullable, () => ({ capacity_quantity: "0" })),
+  null,
+  "disabling a nullable field must restore explicit null",
+);
+assert.equal(
+  transitionNullableValue(true, "12.5", () => "0"),
+  "12.5",
+  "enabling an already-populated nullable field must retain its current value",
+);
+let factoryCalls = 0;
+const enabledFromNull = transitionNullableValue(true, null, () => {
+  factoryCalls += 1;
+  return { capacity_quantity: "0" };
+});
+assert.deepEqual(enabledFromNull, { capacity_quantity: "0" });
+assert.equal(factoryCalls, 1, "enabling a null field must create one non-null value exactly once");
 
 assert.match(resultSummary, /Object\.entries\(snapshot\)/);
 assert.match(resultSummary, /slice\(0, 16\)/);
