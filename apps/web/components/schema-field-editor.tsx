@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { transitionNullableValue } from "../lib/schema-nullability.mjs";
 import styles from "./calculation-workspace.module.css";
 
 type JsonObject = Readonly<Record<string, unknown>>;
@@ -38,6 +39,15 @@ function resolveRef(root: JsonObject, schema: JsonObject): JsonObject {
   const name = ref.slice(prefix.length);
   if (!isRecord(defs) || !isRecord(defs[name])) throw new Error("invalid_schema_ref");
   return defs[name] as JsonObject;
+}
+
+function allowsNull(root: JsonObject, schema: JsonObject): boolean {
+  const resolved = resolveRef(root, schema);
+  const anyOf = resolved.anyOf;
+  if (!Array.isArray(anyOf)) return false;
+  return anyOf
+    .filter(isRecord)
+    .some((candidate) => resolveRef(root, candidate).type === "null");
 }
 
 function effectiveSchema(root: JsonObject, schema: JsonObject): JsonObject {
@@ -115,7 +125,42 @@ function FieldEditor({
 }>): ReactNode {
   const resolved = effectiveSchema(root, schema);
   const controlId = `schema-${path.replaceAll(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const nullable = allowsNull(root, schema);
   const enumValues = resolved.enum;
+
+  if (nullable) {
+    const enabled = value !== null && value !== undefined;
+    return (
+      <fieldset className={styles.fieldGroup}>
+        {label !== null ? <legend className={styles.fieldLegend}>{label}</legend> : null}
+        <label className={styles.schemaField} htmlFor={`${controlId}-enabled`}>
+          <span className={styles.schemaFieldLabel}>Bu alanı kullan</span>
+          <input
+            id={`${controlId}-enabled`}
+            type="checkbox"
+            checked={enabled}
+            onChange={(event) => onChange(transitionNullableValue(
+              event.target.checked,
+              value,
+              () => createValue(resolved, root),
+            ))}
+            disabled={disabled}
+          />
+        </label>
+        {enabled ? (
+          <FieldEditor
+            root={root}
+            schema={resolved}
+            value={value}
+            disabled={disabled}
+            path={`${path}.value`}
+            label={null}
+            onChange={onChange}
+          />
+        ) : null}
+      </fieldset>
+    );
+  }
 
   if (Array.isArray(enumValues) && enumValues.every((item) => typeof item === "string")) {
     return (
@@ -189,7 +234,11 @@ function FieldEditor({
         {Object.entries(properties).map(([key, child]) => {
           if (!isRecord(child)) return null;
           const childSchema = effectiveSchema(root, child);
-          const childValue = recordValue[key] ?? createValue(child, root);
+          const childValue = Object.hasOwn(recordValue, key)
+            ? recordValue[key]
+            : allowsNull(root, child)
+              ? null
+              : createValue(child, root);
           return (
             <FieldEditor
               key={`${path}.${key}`}
