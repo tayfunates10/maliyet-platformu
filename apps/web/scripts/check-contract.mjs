@@ -9,8 +9,13 @@ const requiredFiles = [
   "app/layout.tsx",
   "app/page.tsx",
   "app/globals.css",
+  "app/widget-branding/page.tsx",
+  "app/widget-branding/page.module.css",
+  "components/widget-branding-manager.tsx",
+  "components/widget-branding-manager.module.css",
   "lib/sectors.ts",
   "lib/runtime-config.ts",
+  "lib/widget-branding-management-api.ts",
   "public/widget/v1.0.0/loader.js",
   "public/widget/v1.1.0/loader.js",
   "public/widget/v1.1.0/styles.css",
@@ -19,6 +24,7 @@ const requiredFiles = [
   "scripts/test-widget-loader.mjs",
   "scripts/test-widget-theme-config.mjs",
   "scripts/test-widget-published-branding.mjs",
+  "scripts/test-widget-branding-management.mjs",
   "biome.json",
   "tsconfig.json",
   ".env.example",
@@ -55,6 +61,10 @@ if (
   "node scripts/test-widget-loader.mjs && node scripts/test-widget-theme-config.mjs && node scripts/test-widget-published-branding.mjs"
 ) {
   throw new Error("All published Widget SDK security contract tests must run in CI");
+}
+
+if (packageJson.scripts["management:test"] !== "node scripts/test-widget-branding-management.mjs") {
+  throw new Error("Authenticated widget branding management contract must run in CI");
 }
 
 const nextConfig = readFileSync(resolve(root, "next.config.mjs"), "utf8");

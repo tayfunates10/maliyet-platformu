@@ -87,5 +87,7 @@ jobs:
         run: npm run typecheck
       - name: Widget SDK integration contract
         run: npm run widget:test
+      - name: Widget branding management contract
+        run: npm run management:test
       - name: Next.js build
         run: npm run build

@@ -101,6 +101,18 @@ h3 {
   font-weight: 650;
 }
 
+.managementLink {
+  width: fit-content;
+  color: var(--accent);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.managementLink:hover,
+.managementLink:focus-visible {
+  text-decoration: underline;
+}
+
 .sectorSection {
   margin-top: 72px;
 }

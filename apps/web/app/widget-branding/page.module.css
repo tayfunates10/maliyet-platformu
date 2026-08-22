@@ -1,0 +1,44 @@
+.main {
+  display: grid;
+  gap: 36px;
+}
+
+.header {
+  display: grid;
+  gap: 14px;
+  max-width: 900px;
+}
+
+.header h1 {
+  font-size: clamp(2.25rem, 6vw, 4.6rem);
+  line-height: 1.02;
+}
+
+.backLink {
+  width: fit-content;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.backLink:hover,
+.backLink:focus-visible {
+  text-decoration: underline;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lead {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
