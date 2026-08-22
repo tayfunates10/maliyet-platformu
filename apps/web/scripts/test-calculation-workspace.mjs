@@ -9,10 +9,12 @@ const executionApi = readFileSync(resolve(webRoot, "lib/calculation-execution-ap
 const schemaTemplate = readFileSync(resolve(webRoot, "lib/json-schema-template.ts"), "utf8");
 const workspace = readFileSync(resolve(webRoot, "components/calculation-workspace.tsx"), "utf8");
 const executionPanel = readFileSync(resolve(webRoot, "components/calculation-execution-panel.tsx"), "utf8");
+const schemaEditor = readFileSync(resolve(webRoot, "components/schema-field-editor.tsx"), "utf8");
+const resultSummary = readFileSync(resolve(webRoot, "components/calculation-result-summary.tsx"), "utf8");
 const proxy = readFileSync(resolve(webRoot, "app/api/management/[...path]/route.ts"), "utf8");
 const page = readFileSync(resolve(webRoot, "app/calculations/page.tsx"), "utf8");
 
-for (const source of [apiClient, executionApi, workspace, executionPanel, proxy]) {
+for (const source of [apiClient, executionApi, workspace, executionPanel, schemaEditor, resultSummary, proxy]) {
   assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB|document\.cookie/);
   assert.doesNotMatch(source, /console\.(?:log|debug|info|warn|error)/);
 }
@@ -51,7 +53,7 @@ assert.match(executionApi, /getLatestCalculationVersion/);
 assert.match(executionApi, /returnedCalculationId !== calculationId/);
 assert.match(executionApi, /returnedOrganizationId !== organizationId/);
 assert.match(executionApi, /returnedEngineKey !== engineKey/);
-assert.doesNotMatch(executionApi, /Number\(|parseFloat|parseInt/);
+assert.doesNotMatch(executionApi, /parseFloat|parseInt/);
 assert.doesNotMatch(executionApi, /fetch\(\s*["'`]https?:\/\//);
 
 assert.match(schemaTemplate, /#\/\$defs\//);
@@ -94,13 +96,30 @@ assert.doesNotMatch(workspace, /(?:value|defaultValue|data-[\w-]+|aria-[\w-]+)=\
 
 assert.match(executionPanel, /getEngineDetail/);
 assert.match(executionPanel, /buildSchemaTemplate/);
-assert.match(executionPanel, /JSON\.parse\(inputText\)/);
+assert.match(executionPanel, /SchemaFieldEditor/);
+assert.match(executionPanel, /CalculationResultSummary/);
 assert.match(executionPanel, /executeCalculation/);
 assert.match(executionPanel, /getLatestCalculationVersion/);
 assert.match(executionPanel, /immutable sürüm/);
-assert.match(executionPanel, /Decimal alanları JSON sayı değil metin/);
-assert.doesNotMatch(executionPanel, /Number\(|parseFloat|parseInt/);
+assert.match(executionPanel, /Decimal alanları sayı değil metin/);
+assert.doesNotMatch(executionPanel, /JSON\.parse\(/);
+assert.doesNotMatch(executionPanel, /parseFloat|parseInt/);
 assert.doesNotMatch(executionPanel, /dangerouslySetInnerHTML|innerHTML/);
+
+assert.match(schemaEditor, /valueAsNumber/);
+assert.match(schemaEditor, /resolved\.type === "string"/);
+assert.match(schemaEditor, /resolved\.type === "integer"/);
+assert.match(schemaEditor, /resolved\.type === "boolean"/);
+assert.match(schemaEditor, /resolved\.type === "array"/);
+assert.match(schemaEditor, /resolved\.type === "object"/);
+assert.match(schemaEditor, /enumValues/);
+assert.match(schemaEditor, /#\/\$defs\//);
+assert.doesNotMatch(schemaEditor, /dangerouslySetInnerHTML|innerHTML|eval|Function\(/);
+assert.doesNotMatch(schemaEditor, /parseFloat|parseInt/);
+
+assert.match(resultSummary, /Object\.entries\(snapshot\)/);
+assert.match(resultSummary, /slice\(0, 16\)/);
+assert.doesNotMatch(resultSummary, /dangerouslySetInnerHTML|innerHTML/);
 
 assert.match(page, /CalculationWorkspace/);
 assert.match(page, /Sektör motoru yalnız API allowlist’inden seçilir/);
