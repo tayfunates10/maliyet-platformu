@@ -3,11 +3,13 @@ import { getPublicApiBaseUrl } from "@/lib/runtime-config";
 
 const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}";
 const MAX_BODY_BYTES = 16_384;
+const DEPLOYMENT_PAGE_LIMIT = 100;
 
 type RouteRule = Readonly<{
   method: "GET" | "POST" | "PUT";
   pattern: RegExp;
   authenticated: boolean;
+  allowDeploymentPagination?: boolean;
 }>;
 
 const ROUTE_RULES: readonly RouteRule[] = Object.freeze([
@@ -17,6 +19,12 @@ const ROUTE_RULES: readonly RouteRule[] = Object.freeze([
     method: "GET",
     pattern: new RegExp(`^organizations/${UUID}/widget-branding-profiles$`),
     authenticated: true,
+  },
+  {
+    method: "GET",
+    pattern: new RegExp(`^organizations/${UUID}/widget-deployments$`),
+    authenticated: true,
+    allowDeploymentPagination: true,
   },
   {
     method: "POST",
@@ -62,6 +70,26 @@ function findRule(method: string, path: string): RouteRule | null {
   return ROUTE_RULES.find((rule) => rule.method === method && rule.pattern.test(path)) ?? null;
 }
 
+function validatedQuery(request: NextRequest, rule: RouteRule): string | null {
+  if (request.nextUrl.search === "") return "";
+  if (!rule.allowDeploymentPagination) return null;
+  const keys = [...request.nextUrl.searchParams.keys()];
+  if (keys.some((key) => key !== "limit" && key !== "offset")) return null;
+  if (keys.filter((key) => key === "limit").length > 1 || keys.filter((key) => key === "offset").length > 1) {
+    return null;
+  }
+  const limitText = request.nextUrl.searchParams.get("limit");
+  const offsetText = request.nextUrl.searchParams.get("offset");
+  if (limitText === null || offsetText === null || !/^\d+$/.test(limitText) || !/^\d+$/.test(offsetText)) {
+    return null;
+  }
+  const limit = Number(limitText);
+  const offset = Number(offsetText);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > DEPLOYMENT_PAGE_LIMIT) return null;
+  if (!Number.isSafeInteger(offset) || offset < 0) return null;
+  return `?limit=${limit}&offset=${offset}`;
+}
+
 function genericJson(status: number, detail: string): NextResponse {
   return NextResponse.json(
     { detail },
@@ -79,9 +107,9 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
   const { path: pathParts } = await context.params;
   const path = pathParts.join("/");
   const rule = findRule(request.method, path);
-  if (rule === null || request.nextUrl.search !== "") {
-    return genericJson(404, "management route not found");
-  }
+  if (rule === null) return genericJson(404, "management route not found");
+  const query = validatedQuery(request, rule);
+  if (query === null) return genericJson(404, "management route not found");
 
   const authorization = request.headers.get("authorization");
   if (rule.authenticated) {
@@ -122,7 +150,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${base}/${path}`, {
+    upstream = await fetch(`${base}/${path}${query}`, {
       method: rule.method,
       headers,
       body,

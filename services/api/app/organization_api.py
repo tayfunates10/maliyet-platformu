@@ -27,6 +27,7 @@ from app.widget_api import public_router as widget_public_router
 from app.widget_api import tenant_router as widget_tenant_router
 from app.widget_branding_api import deployment_router as widget_branding_deployment_router
 from app.widget_branding_api import profile_router as widget_branding_profile_router
+from app.widget_deployment_discovery_api import router as widget_deployment_discovery_router
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 router.include_router(tax_profile_router)
@@ -36,6 +37,7 @@ router.include_router(widget_tenant_router)
 router.include_router(widget_public_router)
 router.include_router(widget_branding_profile_router)
 router.include_router(widget_branding_deployment_router)
+router.include_router(widget_deployment_discovery_router)
 
 
 class OrganizationCreateRequest(BaseModel):

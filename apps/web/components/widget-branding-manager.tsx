@@ -7,10 +7,11 @@ import {
   type OrganizationSummary,
   type WidgetBrandingProfile,
   type WidgetBrandingProfileInput,
+  type WidgetDeploymentSummary,
   createBrandingProfile,
-  isDeploymentId,
   listBrandingProfiles,
   listManagementOrganizations,
+  listWidgetDeployments,
   loginManagementSession,
   publishBrandingProfile,
   updateBrandingProfile,
@@ -74,6 +75,7 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
   const [organizations, setOrganizations] = useState<readonly OrganizationSummary[]>([]);
   const [organizationId, setOrganizationId] = useState("");
   const [profiles, setProfiles] = useState<readonly WidgetBrandingProfile[]>([]);
+  const [deployments, setDeployments] = useState<readonly WidgetDeploymentSummary[]>([]);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [draft, setDraft] = useState<WidgetBrandingProfileInput>({ ...DEFAULT_PROFILE });
   const [dirty, setDirty] = useState(false);
@@ -85,10 +87,20 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
 
   const manageableOrganizations = organizations.filter((item) => MANAGER_ROLES.has(item.role));
   const selectedProfile = profiles.find((item) => item.id === profileId) ?? null;
+  const selectedDeployment = deployments.find((item) => item.id === deploymentId) ?? null;
+  const canPublishToDeployment = selectedDeployment?.publishable === true;
 
   function clearFeedback() {
     setError("");
     setNotice("");
+  }
+
+  function resetEditorState() {
+    setProfileId(null);
+    setDraft({ ...DEFAULT_PROFILE });
+    setDirty(false);
+    setDeploymentId("");
+    setConfirmPublish(false);
   }
 
   function updateDraft(patch: Partial<WidgetBrandingProfileInput>) {
@@ -96,6 +108,20 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
     setDirty(true);
     setConfirmPublish(false);
     setNotice("");
+  }
+
+  async function loadOrganizationWorkspace(
+    sessionToken: string,
+    nextOrganizationId: string,
+  ): Promise<void> {
+    const [nextProfiles, nextDeployments] = await Promise.all([
+      listBrandingProfiles(apiBaseUrl, sessionToken, nextOrganizationId),
+      listWidgetDeployments(apiBaseUrl, sessionToken, nextOrganizationId),
+    ]);
+    setOrganizationId(nextOrganizationId);
+    setProfiles(nextProfiles);
+    setDeployments(nextDeployments);
+    resetEditorState();
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -109,25 +135,21 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
       setToken(issuedToken);
       setOrganizations(allOrganizations);
       if (manageable.length > 0) {
-        const first = manageable[0];
-        const firstProfiles = await listBrandingProfiles(apiBaseUrl, issuedToken, first.id);
-        setOrganizationId(first.id);
-        setProfiles(firstProfiles);
+        await loadOrganizationWorkspace(issuedToken, manageable[0].id);
       } else {
         setOrganizationId("");
         setProfiles([]);
+        setDeployments([]);
         setNotice("Bu hesapta widget branding yönetebilen owner/admin organizasyonu bulunmuyor.");
+        resetEditorState();
       }
-      setProfileId(null);
-      setDraft({ ...DEFAULT_PROFILE });
-      setDirty(false);
-      setDeploymentId("");
-      setConfirmPublish(false);
     } catch (caught) {
       setToken(null);
       setOrganizations([]);
       setOrganizationId("");
       setProfiles([]);
+      setDeployments([]);
+      resetEditorState();
       setError(userMessage(caught));
     } finally {
       setPassword("");
@@ -140,14 +162,7 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
     clearFeedback();
     setBusy(true);
     try {
-      const nextProfiles = await listBrandingProfiles(apiBaseUrl, token, nextOrganizationId);
-      setOrganizationId(nextOrganizationId);
-      setProfiles(nextProfiles);
-      setProfileId(null);
-      setDraft({ ...DEFAULT_PROFILE });
-      setDirty(false);
-      setDeploymentId("");
-      setConfirmPublish(false);
+      await loadOrganizationWorkspace(token, nextOrganizationId);
     } catch (caught) {
       setError(userMessage(caught));
     } finally {
@@ -211,8 +226,9 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
       setError("Yayınlamadan önce taslak değişikliklerini kaydedin.");
       return;
     }
-    if (!isDeploymentId(deploymentId)) {
-      setError("Geçerli bir widget deployment UUID girin.");
+    if (selectedDeployment === null || !selectedDeployment.publishable) {
+      setConfirmPublish(false);
+      setError("Yalnız aktif ve kaynağı revoke edilmemiş bir widget deployment yayın hedefi olabilir.");
       return;
     }
     if (!confirmPublish) {
@@ -225,12 +241,12 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
         apiBaseUrl,
         token,
         organizationId,
-        deploymentId.trim(),
+        selectedDeployment.id,
         profileId,
       );
       setConfirmPublish(false);
       setNotice(
-        `Presentation yayınlandı. Profil revision ${receipt.profile_revision} artık seçili deployment için aktif.`,
+        `Presentation yayınlandı. Profil revision ${receipt.profile_revision} artık ${selectedDeployment.name} deployment'ı için aktif.`,
       );
     } catch (caught) {
       setConfirmPublish(false);
@@ -245,11 +261,8 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
     setOrganizations([]);
     setOrganizationId("");
     setProfiles([]);
-    setProfileId(null);
-    setDraft({ ...DEFAULT_PROFILE });
-    setDirty(false);
-    setDeploymentId("");
-    setConfirmPublish(false);
+    setDeployments([]);
+    resetEditorState();
     setEmail("");
     setPassword("");
     setError("");
@@ -383,100 +396,37 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
                       onChange={(event) => updateDraft({ name: event.target.value })}
                     />
                   </label>
-                  <SelectField
-                    label="Tema"
-                    value={draft.theme}
-                    options={["auto", "light", "dark"]}
-                    onChange={(value) => updateDraft({ theme: value as WidgetBrandingProfileInput["theme"] })}
-                  />
-                  <SelectField
-                    label="Dil"
-                    value={draft.locale}
-                    options={["tr", "en"]}
-                    onChange={(value) => updateDraft({ locale: value as WidgetBrandingProfileInput["locale"] })}
-                  />
-                  <SelectField
-                    label="Yoğunluk"
-                    value={draft.density}
-                    options={["comfortable", "compact"]}
-                    onChange={(value) =>
-                      updateDraft({ density: value as WidgetBrandingProfileInput["density"] })
-                    }
-                  />
-                  <SelectField
-                    label="Font ailesi"
-                    value={draft.font_family}
-                    options={["system", "sans", "serif", "monospace"]}
-                    onChange={(value) =>
-                      updateDraft({ font_family: value as WidgetBrandingProfileInput["font_family"] })
-                    }
-                  />
+                  <SelectField label="Tema" value={draft.theme} options={["auto", "light", "dark"]} onChange={(value) => updateDraft({ theme: value as WidgetBrandingProfileInput["theme"] })} />
+                  <SelectField label="Dil" value={draft.locale} options={["tr", "en"]} onChange={(value) => updateDraft({ locale: value as WidgetBrandingProfileInput["locale"] })} />
+                  <SelectField label="Yoğunluk" value={draft.density} options={["comfortable", "compact"]} onChange={(value) => updateDraft({ density: value as WidgetBrandingProfileInput["density"] })} />
+                  <SelectField label="Font ailesi" value={draft.font_family} options={["system", "sans", "serif", "monospace"]} onChange={(value) => updateDraft({ font_family: value as WidgetBrandingProfileInput["font_family"] })} />
                   <label className={styles.field}>
                     <span>Köşe yarıçapı: {draft.border_radius_px}px</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="32"
-                      step="1"
-                      value={draft.border_radius_px}
-                      onChange={(event) => updateDraft({ border_radius_px: event.target.valueAsNumber })}
-                    />
+                    <input type="range" min="0" max="32" step="1" value={draft.border_radius_px} onChange={(event) => updateDraft({ border_radius_px: event.target.valueAsNumber })} />
                   </label>
                   <label className={styles.checkboxField}>
-                    <input
-                      type="checkbox"
-                      checked={draft.show_title}
-                      onChange={(event) => updateDraft({ show_title: event.target.checked })}
-                    />
+                    <input type="checkbox" checked={draft.show_title} onChange={(event) => updateDraft({ show_title: event.target.checked })} />
                     <span>Başlığı göster</span>
                   </label>
                 </div>
 
                 <fieldset className={styles.colorSet}>
                   <legend>Açık tema</legend>
-                  <ColorField
-                    label="Arka plan"
-                    value={draft.light_background_color}
-                    onChange={(value) => updateDraft({ light_background_color: value })}
-                  />
-                  <ColorField
-                    label="Metin"
-                    value={draft.light_text_color}
-                    onChange={(value) => updateDraft({ light_text_color: value })}
-                  />
-                  <ColorField
-                    label="Çerçeve"
-                    value={draft.light_border_color}
-                    onChange={(value) => updateDraft({ light_border_color: value })}
-                  />
+                  <ColorField label="Arka plan" value={draft.light_background_color} onChange={(value) => updateDraft({ light_background_color: value })} />
+                  <ColorField label="Metin" value={draft.light_text_color} onChange={(value) => updateDraft({ light_text_color: value })} />
+                  <ColorField label="Çerçeve" value={draft.light_border_color} onChange={(value) => updateDraft({ light_border_color: value })} />
                 </fieldset>
 
                 <fieldset className={styles.colorSet}>
                   <legend>Koyu tema</legend>
-                  <ColorField
-                    label="Arka plan"
-                    value={draft.dark_background_color}
-                    onChange={(value) => updateDraft({ dark_background_color: value })}
-                  />
-                  <ColorField
-                    label="Metin"
-                    value={draft.dark_text_color}
-                    onChange={(value) => updateDraft({ dark_text_color: value })}
-                  />
-                  <ColorField
-                    label="Çerçeve"
-                    value={draft.dark_border_color}
-                    onChange={(value) => updateDraft({ dark_border_color: value })}
-                  />
+                  <ColorField label="Arka plan" value={draft.dark_background_color} onChange={(value) => updateDraft({ dark_background_color: value })} />
+                  <ColorField label="Metin" value={draft.dark_text_color} onChange={(value) => updateDraft({ dark_text_color: value })} />
+                  <ColorField label="Çerçeve" value={draft.dark_border_color} onChange={(value) => updateDraft({ dark_border_color: value })} />
                 </fieldset>
 
                 <fieldset className={styles.colorSet}>
                   <legend>Durum</legend>
-                  <ColorField
-                    label="Hata rengi"
-                    value={draft.error_color}
-                    onChange={(value) => updateDraft({ error_color: value })}
-                  />
+                  <ColorField label="Hata rengi" value={draft.error_color} onChange={(value) => updateDraft({ error_color: value })} />
                 </fieldset>
 
                 <div className={styles.actions}>
@@ -496,42 +446,49 @@ export function WidgetBrandingManager({ apiBaseUrl }: Readonly<{ apiBaseUrl: str
                   <span className={styles.warningBadge}>Ayrı işlem</span>
                 </div>
                 <p className={styles.muted}>
-                  Yalnız kaydedilmiş revision yayınlanır. Taslak değişikliği bu buton olmadan canlıya
-                  geçmez.
+                  Yalnız kaydedilmiş revision ve bu organizasyondan keşfedilen aktif deployment
+                  yayınlanabilir. Disabled veya kaynağı revoke edilmiş deployment'lar yalnız durum
+                  görünürlüğü için listelenir.
                 </p>
                 <label className={styles.fieldWide}>
-                  <span>Widget deployment UUID</span>
-                  <input
-                    type="text"
-                    inputMode="text"
-                    spellCheck={false}
-                    placeholder="8e8d7c2b-6a0b-4d2e-9a48-9a3115d6f44b"
+                  <span>Widget deployment</span>
+                  <select
                     value={deploymentId}
                     onChange={(event) => {
                       setDeploymentId(event.target.value);
                       setConfirmPublish(false);
                     }}
-                  />
+                    disabled={busy || deployments.length === 0}
+                  >
+                    <option value="">Deployment seçin</option>
+                    {deployments.map((deployment) => (
+                      <option key={deployment.id} value={deployment.id} disabled={!deployment.publishable}>
+                        {deployment.name} · {deployment.publishable ? "aktif" : "yayınlanamaz"}
+                      </option>
+                    ))}
+                  </select>
                 </label>
+                {deployments.length === 0 ? (
+                  <p className={styles.muted}>Bu organizasyonda keşfedilmiş widget deployment bulunmuyor.</p>
+                ) : null}
+                {selectedDeployment !== null && !selectedDeployment.publishable ? (
+                  <p className={styles.muted} role="status">
+                    Bu deployment disabled veya kaynak projection revoke edilmiş olduğu için yayın hedefi olamaz.
+                  </p>
+                ) : null}
                 <label className={styles.confirmField}>
                   <input
                     type="checkbox"
                     checked={confirmPublish}
                     onChange={(event) => setConfirmPublish(event.target.checked)}
-                    disabled={profileId === null || dirty || !isDeploymentId(deploymentId)}
+                    disabled={profileId === null || dirty || !canPublishToDeployment}
                   />
                   <span>Bu işlem seçili kaydedilmiş revision'ı canlı widget görünümüne yayınlar.</span>
                 </label>
                 <button
                   className={styles.dangerButton}
                   type="submit"
-                  disabled={
-                    busy ||
-                    profileId === null ||
-                    dirty ||
-                    !isDeploymentId(deploymentId) ||
-                    !confirmPublish
-                  }
+                  disabled={busy || profileId === null || dirty || !canPublishToDeployment || !confirmPublish}
                 >
                   Canlı presentation'ı yayınla
                 </button>
