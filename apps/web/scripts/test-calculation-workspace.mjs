@@ -58,6 +58,9 @@ assert.match(schemaTemplate, /#\/\$defs\//);
 assert.match(schemaTemplate, /schema_depth_exceeded/);
 assert.match(schemaTemplate, /buildSchemaTemplate/);
 assert.match(schemaTemplate, /listRequiredFields/);
+assert.match(schemaTemplate, /templateForRequiredArray/);
+assert.match(schemaTemplate, /return \[templateFor\(items, root, depth \+ 1\)\]/);
+assert.match(schemaTemplate, /required\.has\(key\)/);
 assert.doesNotMatch(schemaTemplate, /eval|Function\(/);
 
 assert.match(proxy, /\^auth\\\/logout\$/);
