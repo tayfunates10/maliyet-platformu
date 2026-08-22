@@ -7,8 +7,12 @@ const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const apiClient = readFileSync(resolve(webRoot, "lib/widget-branding-management-api.ts"), "utf8");
 const manager = readFileSync(resolve(webRoot, "components/widget-branding-manager.tsx"), "utf8");
 const managementPage = readFileSync(resolve(webRoot, "app/widget-branding/page.tsx"), "utf8");
+const managementProxy = readFileSync(
+  resolve(webRoot, "app/api/management/[...path]/route.ts"),
+  "utf8",
+);
 
-for (const source of [apiClient, manager]) {
+for (const source of [apiClient, manager, managementProxy]) {
   assert.doesNotMatch(source, /localStorage/);
   assert.doesNotMatch(source, /sessionStorage/);
   assert.doesNotMatch(source, /indexedDB/);
@@ -16,8 +20,7 @@ for (const source of [apiClient, manager]) {
   assert.doesNotMatch(source, /console\.(?:log|debug|info|warn|error)/);
 }
 
-assert.match(apiClient, /parsed\.protocol === "https:"/);
-assert.match(apiClient, /parsed\.protocol === "http:" && loopback/);
+assert.match(apiClient, /const MANAGEMENT_PREFIX = "\/api\/management"/);
 assert.match(apiClient, /credentials:\s*"omit"/);
 assert.match(apiClient, /cache:\s*"no-store"/);
 assert.match(apiClient, /redirect:\s*"error"/);
@@ -25,14 +28,33 @@ assert.match(apiClient, /referrerPolicy:\s*"no-referrer"/);
 assert.match(apiClient, /headers\.set\("Authorization", `Bearer \$\{options\.token\}`\)/);
 assert.doesNotMatch(apiClient, /response\.text\s*\(/);
 assert.doesNotMatch(apiClient, /response\.statusText/);
+assert.doesNotMatch(apiClient, /https?:\/\//);
 
 assert.match(apiClient, /"\/auth\/login"/);
-assert.match(apiClient, /"\/organizations\?limit=100&offset=0"/);
-assert.match(apiClient, /widget-branding-profiles\?limit=100&offset=0/);
-assert.match(apiClient, /widget-branding-profiles`/);
+assert.match(apiClient, /"\/organizations"/);
+assert.match(apiClient, /widget-branding-profiles/);
 assert.match(apiClient, /widget-deployments\/\$\{encodeURIComponent\(deploymentId\)\}\/presentation/);
 assert.match(apiClient, /body:\s*\{ branding_profile_id: profileId \}/);
 assert.match(apiClient, /UUID_PATTERN/);
+
+assert.match(managementProxy, /getPublicApiBaseUrl/);
+assert.match(managementProxy, /parsed\.protocol === "https:"/);
+assert.match(managementProxy, /parsed\.protocol === "http:" && loopback/);
+assert.match(managementProxy, /const ROUTE_RULES/);
+assert.match(managementProxy, /\^auth\\\/login\$/);
+assert.match(managementProxy, /\^organizations\$/);
+assert.match(managementProxy, /widget-branding-profiles/);
+assert.match(managementProxy, /widget-deployments\/\$\{UUID\}\/presentation/);
+assert.match(managementProxy, /request\.nextUrl\.search !== ""/);
+assert.match(managementProxy, /MAX_BODY_BYTES = 16_384/);
+assert.match(managementProxy, /authorization\.startsWith\("Bearer "\)/);
+assert.match(managementProxy, /authorization not accepted on login/);
+assert.match(managementProxy, /"Cache-Control": "no-store"/);
+assert.match(managementProxy, /"X-Content-Type-Options": "nosniff"/);
+assert.doesNotMatch(managementProxy, /allow_origins|Access-Control-Allow-Origin/);
+assert.doesNotMatch(managementProxy, /headers\.get\("cookie"\)/i);
+assert.doesNotMatch(managementProxy, /headers\.get\("origin"\)/i);
+assert.doesNotMatch(managementProxy, /headers\.get\("referer"\)/i);
 
 assert.match(manager, /type="password"/);
 assert.match(manager, /setPassword\(""\)/);
