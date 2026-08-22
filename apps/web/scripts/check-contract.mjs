@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,8 +14,11 @@ const requiredFiles = [
   "public/widget/v1.0.0/loader.js",
   "public/widget/v1.1.0/loader.js",
   "public/widget/v1.1.0/styles.css",
+  "public/widget/v1.2.0/loader.js",
+  "public/widget/v1.2.0/styles.css",
   "scripts/test-widget-loader.mjs",
   "scripts/test-widget-theme-config.mjs",
+  "scripts/test-widget-published-branding.mjs",
   "biome.json",
   "tsconfig.json",
   ".env.example",
@@ -49,7 +52,7 @@ if (packageJson.devDependencies["@biomejs/biome"] !== "2.5.6") {
 
 if (
   packageJson.scripts["widget:test"] !==
-  "node scripts/test-widget-loader.mjs && node scripts/test-widget-theme-config.mjs"
+  "node scripts/test-widget-loader.mjs && node scripts/test-widget-theme-config.mjs && node scripts/test-widget-published-branding.mjs"
 ) {
   throw new Error("All published Widget SDK security contract tests must run in CI");
 }
@@ -67,6 +70,11 @@ if (!widgetV100.includes('const SDK_VERSION = "1.0.0"')) {
 const widgetV110 = readFileSync(resolve(root, "public/widget/v1.1.0/loader.js"), "utf8");
 if (!widgetV110.includes('const SDK_VERSION = "1.1.0"')) {
   throw new Error("Widget v1.1.0 asset must self-identify as version 1.1.0");
+}
+
+const widgetV120 = readFileSync(resolve(root, "public/widget/v1.2.0/loader.js"), "utf8");
+if (!widgetV120.includes('const SDK_VERSION = "1.2.0"')) {
+  throw new Error("Widget v1.2.0 asset must self-identify as version 1.2.0");
 }
 
 const sectorsSource = readFileSync(resolve(root, "lib/sectors.ts"), "utf8");
