@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getPublicApiBaseUrl } from "@/lib/runtime-config";
 
 const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}";
+const ENGINE_KEY = "[a-z][a-z0-9_]{0,79}";
 const MAX_BODY_BYTES = 16_384;
 const DEPLOYMENT_PAGE_LIMIT = 100;
 
@@ -18,6 +19,7 @@ const ROUTE_RULES: readonly RouteRule[] = Object.freeze([
   { method: "POST", pattern: /^auth\/logout$/, authenticated: true, allowEmptyBody: true },
   { method: "GET", pattern: /^organizations$/, authenticated: true, allowDeploymentPagination: true },
   { method: "GET", pattern: /^engines$/, authenticated: true },
+  { method: "GET", pattern: new RegExp(`^engines/${ENGINE_KEY}$`), authenticated: true },
   {
     method: "GET",
     pattern: new RegExp(`^organizations/${UUID}/calculations$`),
@@ -27,6 +29,17 @@ const ROUTE_RULES: readonly RouteRule[] = Object.freeze([
   {
     method: "POST",
     pattern: new RegExp(`^organizations/${UUID}/calculations$`),
+    authenticated: true,
+  },
+  {
+    method: "GET",
+    pattern: new RegExp(`^organizations/${UUID}/calculations/${UUID}/versions$`),
+    authenticated: true,
+    allowDeploymentPagination: true,
+  },
+  {
+    method: "POST",
+    pattern: new RegExp(`^organizations/${UUID}/calculations/${UUID}/execute/${ENGINE_KEY}$`),
     authenticated: true,
   },
   {
