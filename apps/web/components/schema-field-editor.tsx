@@ -12,8 +12,21 @@ type Props = Readonly<{
   onChange: (value: Readonly<Record<string, unknown>>) => void;
 }>;
 
+const ITEM_IDS = new WeakMap<object, string>();
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function stableItemKey(item: unknown): string {
+  if (item !== null && typeof item === "object") {
+    const existing = ITEM_IDS.get(item);
+    if (existing !== undefined) return existing;
+    const created = crypto.randomUUID();
+    ITEM_IDS.set(item, created);
+    return created;
+  }
+  return `${typeof item}:${String(item)}`;
 }
 
 function resolveRef(root: JsonObject, schema: JsonObject): JsonObject {
@@ -46,6 +59,13 @@ function cloneRecord(value: Readonly<Record<string, unknown>>, key: string, next
   return Object.freeze({ ...value, [key]: nextValue });
 }
 
+function createArrayItem(schema: JsonObject, root: JsonObject): unknown {
+  const resolved = effectiveSchema(root, schema);
+  const items = resolved.items;
+  if (!isRecord(items)) throw new Error("invalid_array_items_schema");
+  return createValue(items, root);
+}
+
 function createValue(schema: JsonObject, root: JsonObject): unknown {
   const resolved = effectiveSchema(root, schema);
   if (resolved.default !== undefined) return structuredClone(resolved.default);
@@ -62,7 +82,14 @@ function createValue(schema: JsonObject, root: JsonObject): unknown {
     const result: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(properties)) {
       if (!isRecord(child)) continue;
-      if (required.has(key) || child.default !== undefined) result[key] = createValue(child, root);
+      const childSchema = effectiveSchema(root, child);
+      if (required.has(key)) {
+        result[key] = childSchema.type === "array" && childSchema.default === undefined
+          ? [createArrayItem(childSchema, root)]
+          : createValue(child, root);
+      } else if (child.default !== undefined) {
+        result[key] = createValue(child, root);
+      }
     }
     return result;
   }
@@ -75,6 +102,7 @@ function FieldEditor({
   value,
   disabled,
   path,
+  label,
   onChange,
 }: Readonly<{
   root: JsonObject;
@@ -82,50 +110,74 @@ function FieldEditor({
   value: unknown;
   disabled: boolean;
   path: string;
+  label: string | null;
   onChange: (value: unknown) => void;
 }>): ReactNode {
   const resolved = effectiveSchema(root, schema);
+  const controlId = `schema-${path.replaceAll(/[^a-zA-Z0-9_-]/g, "-")}`;
   const enumValues = resolved.enum;
+
   if (Array.isArray(enumValues) && enumValues.every((item) => typeof item === "string")) {
     return (
-      <select value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
-        {enumValues.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
+      <label className={styles.schemaField} htmlFor={controlId}>
+        {label !== null ? <span className={styles.schemaFieldLabel}>{label}</span> : null}
+        <select id={controlId} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+          {enumValues.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      </label>
     );
   }
 
   if (resolved.type === "string") {
-    return <input value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} disabled={disabled} />;
+    return (
+      <label className={styles.schemaField} htmlFor={controlId}>
+        {label !== null ? <span className={styles.schemaFieldLabel}>{label}</span> : null}
+        <input id={controlId} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+      </label>
+    );
   }
   if (resolved.type === "integer") {
     return (
-      <input
-        type="number"
-        step={1}
-        value={typeof value === "number" && Number.isSafeInteger(value) ? value : 0}
-        onChange={(event) => {
-          const next = event.target.valueAsNumber;
-          if (Number.isSafeInteger(next)) onChange(next);
-        }}
-        disabled={disabled}
-      />
+      <label className={styles.schemaField} htmlFor={controlId}>
+        {label !== null ? <span className={styles.schemaFieldLabel}>{label}</span> : null}
+        <input
+          id={controlId}
+          type="number"
+          step={1}
+          value={typeof value === "number" && Number.isSafeInteger(value) ? value : 0}
+          onChange={(event) => {
+            const next = event.target.valueAsNumber;
+            if (Number.isSafeInteger(next)) onChange(next);
+          }}
+          disabled={disabled}
+        />
+      </label>
     );
   }
   if (resolved.type === "number") {
     return (
-      <input
-        type="number"
-        value={typeof value === "number" && Number.isFinite(value) ? value : 0}
-        onChange={(event) => {
-          const next = event.target.valueAsNumber;
-          if (Number.isFinite(next)) onChange(next);
-        }}
-        disabled={disabled}
-      />
+      <label className={styles.schemaField} htmlFor={controlId}>
+        {label !== null ? <span className={styles.schemaFieldLabel}>{label}</span> : null}
+        <input
+          id={controlId}
+          type="number"
+          value={typeof value === "number" && Number.isFinite(value) ? value : 0}
+          onChange={(event) => {
+            const next = event.target.valueAsNumber;
+            if (Number.isFinite(next)) onChange(next);
+          }}
+          disabled={disabled}
+        />
+      </label>
     );
   }
   if (resolved.type === "boolean") {
-    return <input type="checkbox" checked={value === true} onChange={(event) => onChange(event.target.checked)} disabled={disabled} />;
+    return (
+      <label className={styles.schemaField} htmlFor={controlId}>
+        {label !== null ? <span className={styles.schemaFieldLabel}>{label}</span> : null}
+        <input id={controlId} type="checkbox" checked={value === true} onChange={(event) => onChange(event.target.checked)} disabled={disabled} />
+      </label>
+    );
   }
   if (resolved.type === "object") {
     const properties = resolved.properties;
@@ -133,22 +185,22 @@ function FieldEditor({
     if (!isRecord(properties)) return <p>Bu nesnenin düzenlenebilir alanı yok.</p>;
     return (
       <fieldset className={styles.fieldGroup}>
+        {label !== null ? <legend className={styles.fieldLegend}>{label}</legend> : null}
         {Object.entries(properties).map(([key, child]) => {
           if (!isRecord(child)) return null;
           const childSchema = effectiveSchema(root, child);
           const childValue = recordValue[key] ?? createValue(child, root);
           return (
-            <label key={`${path}.${key}`} className={styles.schemaField}>
-              <span>{labelFor(key, childSchema)}</span>
-              <FieldEditor
-                root={root}
-                schema={child}
-                value={childValue}
-                disabled={disabled}
-                path={`${path}.${key}`}
-                onChange={(next) => onChange(cloneRecord(recordValue, key, next))}
-              />
-            </label>
+            <FieldEditor
+              key={`${path}.${key}`}
+              root={root}
+              schema={child}
+              value={childValue}
+              disabled={disabled}
+              path={`${path}.${key}`}
+              label={labelFor(key, childSchema)}
+              onChange={(next) => onChange(cloneRecord(recordValue, key, next))}
+            />
           );
         })}
       </fieldset>
@@ -159,39 +211,46 @@ function FieldEditor({
     if (!isRecord(items)) return <p>Bu listenin öğe şeması desteklenmiyor.</p>;
     const arrayValue = Array.isArray(value) ? value : [];
     return (
-      <div className={styles.arrayEditor}>
-        {arrayValue.map((item, index) => (
-          <div key={`${path}.${index}`} className={styles.arrayItem}>
-            <div className={styles.arrayHeader}>
-              <strong>Öğe {index + 1}</strong>
-              <button
-                type="button"
-                className={styles.secondary}
-                onClick={() => onChange(Object.freeze(arrayValue.filter((_, itemIndex) => itemIndex !== index)))}
-                disabled={disabled}
-              >
-                Sil
-              </button>
-            </div>
-            <FieldEditor
-              root={root}
-              schema={items}
-              value={item}
-              disabled={disabled}
-              path={`${path}.${index}`}
-              onChange={(next) => onChange(Object.freeze(arrayValue.map((current, itemIndex) => itemIndex === index ? next : current)))}
-            />
-          </div>
-        ))}
-        <button
-          type="button"
-          className={styles.secondary}
-          onClick={() => onChange(Object.freeze([...arrayValue, createValue(items, root)]))}
-          disabled={disabled}
-        >
-          Öğe ekle
-        </button>
-      </div>
+      <fieldset className={styles.fieldGroup}>
+        {label !== null ? <legend className={styles.fieldLegend}>{label}</legend> : null}
+        <div className={styles.arrayEditor}>
+          {arrayValue.map((item) => {
+            const identity = stableItemKey(item);
+            return (
+              <div key={identity} className={styles.arrayItem}>
+                <div className={styles.arrayHeader}>
+                  <strong>Öğe</strong>
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    onClick={() => onChange(Object.freeze(arrayValue.filter((current) => current !== item)))}
+                    disabled={disabled}
+                  >
+                    Sil
+                  </button>
+                </div>
+                <FieldEditor
+                  root={root}
+                  schema={items}
+                  value={item}
+                  disabled={disabled}
+                  path={`${path}.${identity}`}
+                  label={null}
+                  onChange={(next) => onChange(Object.freeze(arrayValue.map((current) => current === item ? next : current)))}
+                />
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={() => onChange(Object.freeze([...arrayValue, createArrayItem(resolved, root)]))}
+            disabled={disabled}
+          >
+            Öğe ekle
+          </button>
+        </div>
+      </fieldset>
     );
   }
   return <p>Bu alan türü görsel editörde desteklenmiyor.</p>;
@@ -200,7 +259,7 @@ function FieldEditor({
 export function SchemaFieldEditor({ schema, value, disabled, onChange }: Props) {
   return (
     <div className={styles.schemaEditor}>
-      <FieldEditor root={schema} schema={schema} value={value} disabled={disabled} path="root" onChange={(next) => {
+      <FieldEditor root={schema} schema={schema} value={value} disabled={disabled} path="root" label={null} onChange={(next) => {
         if (isRecord(next)) onChange(Object.freeze({ ...next }));
       }} />
     </div>
