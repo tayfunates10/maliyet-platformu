@@ -12,6 +12,7 @@ import {
   logoutWorkspace,
   type WorkspaceOrganization,
 } from "@/lib/calculation-workspace-api";
+import { CalculationExecutionPanel } from "./calculation-execution-panel";
 import styles from "./calculation-workspace.module.css";
 
 type Notice = Readonly<{ kind: "error" | "success" | "info"; text: string }> | null;
@@ -36,12 +37,17 @@ export function CalculationWorkspace() {
   const [engines, setEngines] = useState<readonly EngineSummary[]>([]);
   const [organizationId, setOrganizationId] = useState("");
   const [calculations, setCalculations] = useState<readonly CalculationSummary[]>([]);
+  const [selectedCalculationId, setSelectedCalculationId] = useState("");
   const [name, setName] = useState("");
   const [engineKey, setEngineKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
   const selectedOrganization = organizations.find((organization) => organization.id === organizationId) ?? null;
+  const selectedCalculation = calculations.find((calculation) => calculation.id === selectedCalculationId) ?? null;
+  const selectedCalculationEngine = selectedCalculation === null
+    ? null
+    : engines.find((engine) => engine.key === selectedCalculation.calculation_type) ?? null;
   const canWrite = selectedOrganization !== null && WRITE_ROLES.has(selectedOrganization.role);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -62,6 +68,7 @@ export function CalculationWorkspace() {
       const firstEngine = nextEngines[0] ?? null;
       setOrganizationId(firstOrganization?.id ?? "");
       setEngineKey(firstEngine?.key ?? "");
+      setSelectedCalculationId("");
       if (firstOrganization !== null) {
         setCalculations(await listCalculations(nextToken, firstOrganization.id));
       } else {
@@ -73,6 +80,7 @@ export function CalculationWorkspace() {
       setOrganizations([]);
       setEngines([]);
       setCalculations([]);
+      setSelectedCalculationId("");
       setPassword("");
       setNotice({ kind: "error", text: friendlyError(error) });
     } finally {
@@ -83,6 +91,7 @@ export function CalculationWorkspace() {
   async function handleOrganizationChange(nextOrganizationId: string) {
     setOrganizationId(nextOrganizationId);
     setCalculations([]);
+    setSelectedCalculationId("");
     setNotice(null);
     if (token === null || nextOrganizationId === "") return;
     setBusy(true);
@@ -107,7 +116,8 @@ export function CalculationWorkspace() {
       });
       setName("");
       setCalculations((current) => Object.freeze([created, ...current]));
-      setNotice({ kind: "success", text: "Hesaplama kaydı oluşturuldu." });
+      setSelectedCalculationId(created.id);
+      setNotice({ kind: "success", text: "Hesaplama kaydı oluşturuldu ve yürütme panelinde açıldı." });
     } catch (error) {
       setNotice({ kind: "error", text: friendlyError(error) });
     } finally {
@@ -127,6 +137,7 @@ export function CalculationWorkspace() {
       setEngines([]);
       setOrganizationId("");
       setCalculations([]);
+      setSelectedCalculationId("");
       setName("");
       setEngineKey("");
       setNotice({ kind: "info", text: "Sunucu oturumu kapatıldı ve yerel oturum bilgisi temizlendi." });
@@ -189,7 +200,7 @@ export function CalculationWorkspace() {
             </select>
           </label>
           {selectedOrganization !== null && !canWrite ? (
-            <p role="status">Bu rol salt-okunur. Mevcut hesaplamaları görüntüleyebilirsiniz.</p>
+            <p role="status">Bu rol salt-okunur. Mevcut hesaplamaları ve kayıtlı sonuçları görüntüleyebilirsiniz.</p>
           ) : null}
         </div>
 
@@ -226,19 +237,41 @@ export function CalculationWorkspace() {
           <ul className={styles.list}>
             {calculations.map((calculation) => {
               const engine = engines.find((item) => item.key === calculation.calculation_type);
+              const selected = calculation.id === selectedCalculationId;
               return (
                 <li key={calculation.id}>
                   <div>
                     <strong>{calculation.name}</strong>
                     <span>{engine?.title ?? calculation.calculation_type}</span>
                   </div>
-                  <time dateTime={calculation.updated_at}>{new Date(calculation.updated_at).toLocaleString("tr-TR")}</time>
+                  <div className={styles.listActions}>
+                    <time dateTime={calculation.updated_at}>{new Date(calculation.updated_at).toLocaleString("tr-TR")}</time>
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      aria-pressed={selected}
+                      onClick={() => setSelectedCalculationId(selected ? "" : calculation.id)}
+                    >
+                      {selected ? "Kapat" : "Aç / çalıştır"}
+                    </button>
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+
+      {selectedOrganization !== null && selectedCalculation !== null && selectedCalculationEngine !== null ? (
+        <CalculationExecutionPanel
+          key={selectedCalculation.id}
+          token={token}
+          organizationId={selectedOrganization.id}
+          calculation={selectedCalculation}
+          engine={selectedCalculationEngine}
+          canWrite={canWrite}
+        />
+      ) : null}
     </section>
   );
 }
