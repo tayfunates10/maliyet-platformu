@@ -1,0 +1,323 @@
+.panel,
+.workspace,
+.card,
+.publishCard,
+.profileList {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 18px 60px rgb(18 24 38 / 6%);
+}
+
+.panel {
+  display: grid;
+  gap: 24px;
+  max-width: 680px;
+  padding: 32px;
+  border-radius: 24px;
+}
+
+.panelHeading,
+.cardHeading,
+.toolbar,
+.listHeading,
+.actions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panelHeading {
+  display: grid;
+  justify-content: stretch;
+}
+
+.panelHeading p,
+.muted {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.kicker {
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.form,
+.editorColumn,
+.workspace {
+  display: grid;
+  gap: 20px;
+}
+
+.workspace {
+  padding: 28px;
+  border-radius: 26px;
+}
+
+.toolbar {
+  align-items: flex-start;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.32fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.profileList,
+.card,
+.publishCard {
+  padding: 22px;
+  border-radius: 20px;
+}
+
+.profileList {
+  align-self: start;
+}
+
+.profileList ul {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profileButton,
+.selectedProfile {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.selectedProfile {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.profileButton span,
+.selectedProfile span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.field,
+.fieldWide,
+.colorField {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.fieldWide {
+  grid-column: 1 / -1;
+}
+
+.field input,
+.field select,
+.fieldWide input {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.field input[type="range"] {
+  min-height: 34px;
+  padding: 0;
+}
+
+.checkboxField,
+.confirmField {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--foreground);
+  line-height: 1.45;
+}
+
+.colorSet {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.colorSet legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.colorControl {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.colorControl input {
+  width: 42px;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.colorControl code {
+  font-size: 0.78rem;
+}
+
+.actions {
+  justify-content: flex-start;
+  margin-top: 20px;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  min-height: 42px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.secondaryButton {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--foreground);
+}
+
+.dangerButton {
+  width: fit-content;
+  border: 1px solid #9f1239;
+  background: #9f1239;
+  color: #fff;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.profileButton:disabled,
+.selectedProfile:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.publishCard {
+  display: grid;
+  gap: 16px;
+  border-color: #f1c4cf;
+}
+
+.dirtyBadge,
+.warningBadge {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.dirtyBadge {
+  background: #fff4d6;
+  color: #7a4b00;
+}
+
+.warningBadge {
+  background: #fff0f3;
+  color: #9f1239;
+}
+
+.errorMessage,
+.noticeMessage {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  line-height: 1.45;
+}
+
+.errorMessage {
+  background: #fff0f3;
+  color: #8f1238;
+}
+
+.noticeMessage {
+  background: #eefaf1;
+  color: #176534;
+}
+
+.feedbackSpacer {
+  min-height: 0;
+}
+
+@media (max-width: 850px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .formGrid,
+  .colorSet {
+    grid-template-columns: 1fr;
+  }
+
+  .fieldWide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .workspace,
+  .panel {
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .toolbar,
+  .cardHeading,
+  .listHeading,
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dangerButton {
+    width: 100%;
+  }
+}

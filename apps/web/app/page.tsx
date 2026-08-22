@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SectorCard } from "@/components/sector-card";
 import { getPublicApiBaseUrl } from "@/lib/runtime-config";
 import { SECTORS } from "@/lib/sectors";
@@ -18,6 +19,9 @@ export default function HomePage() {
           <span>API hedefi</span>
           <code>{apiBaseUrl}</code>
         </div>
+        <Link className="managementLink" href="/widget-branding">
+          Widget branding yönetimine git →
+        </Link>
       </section>
 
       <section className="sectorSection" aria-labelledby="sectors-title">
