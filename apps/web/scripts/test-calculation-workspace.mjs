@@ -85,8 +85,9 @@ assert.match(workspace, /await logoutWorkspace\(token\)/);
 assert.match(workspace, /CalculationExecutionPanel/);
 assert.match(workspace, /selectedCalculationId/);
 assert.match(workspace, /Oturumu kapat/);
+assert.match(workspace, /token=\{token\}/);
 assert.doesNotMatch(workspace, /useEffect/);
-assert.doesNotMatch(workspace, /\{token\}/);
+assert.doesNotMatch(workspace, /(?:value|defaultValue|data-[\w-]+|aria-[\w-]+)=\{token\}|>\s*\{token\}\s*</);
 
 assert.match(executionPanel, /getEngineDetail/);
 assert.match(executionPanel, /buildSchemaTemplate/);
