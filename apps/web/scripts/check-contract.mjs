@@ -9,6 +9,7 @@ const requiredFiles = [
   "app/layout.tsx",
   "app/page.tsx",
   "app/globals.css",
+  "app/api/management/[...path]/route.ts",
   "app/widget-branding/page.tsx",
   "app/widget-branding/page.module.css",
   "components/widget-branding-manager.tsx",
