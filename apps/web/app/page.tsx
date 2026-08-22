@@ -19,6 +19,9 @@ export default function HomePage() {
           <span>API hedefi</span>
           <code>{apiBaseUrl}</code>
         </div>
+        <Link className="managementLink" href="/calculations">
+          Hesaplama çalışma alanına git →
+        </Link>
         <Link className="managementLink" href="/widget-branding">
           Widget branding yönetimine git →
         </Link>
