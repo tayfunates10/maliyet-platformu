@@ -17,6 +17,22 @@ function resolveRef(root: JsonObject, ref: string): JsonObject {
   return defs[name] as JsonObject;
 }
 
+function templateForRequiredArray(schema: JsonObject, root: JsonObject, depth: number): readonly unknown[] {
+  if (depth > 12) throw new Error("schema_depth_exceeded");
+  if (typeof schema.$ref === "string") {
+    return templateForRequiredArray(resolveRef(root, schema.$ref), root, depth + 1);
+  }
+  if (schema.default !== undefined) {
+    const value = cloneJson(schema.default);
+    if (!Array.isArray(value)) throw new Error("invalid_array_default");
+    return value;
+  }
+  if (schema.type !== "array") throw new Error("invalid_required_array_schema");
+  const items = schema.items;
+  if (!isRecord(items)) throw new Error("invalid_array_items_schema");
+  return [templateFor(items, root, depth + 1)];
+}
+
 function templateFor(schema: JsonObject, root: JsonObject, depth: number): unknown {
   if (depth > 12) throw new Error("schema_depth_exceeded");
   if (typeof schema.$ref === "string") return templateFor(resolveRef(root, schema.$ref), root, depth + 1);
@@ -38,7 +54,13 @@ function templateFor(schema: JsonObject, root: JsonObject, depth: number): unkno
   const result: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(properties)) {
     if (!isRecord(child)) continue;
-    if (required.has(key) || child.default !== undefined) result[key] = templateFor(child, root, depth + 1);
+    if (required.has(key)) {
+      result[key] = child.type === "array" && child.default === undefined
+        ? templateForRequiredArray(child, root, depth + 1)
+        : templateFor(child, root, depth + 1);
+    } else if (child.default !== undefined) {
+      result[key] = templateFor(child, root, depth + 1);
+    }
   }
   return result;
 }
