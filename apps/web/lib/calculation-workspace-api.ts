@@ -1,7 +1,8 @@
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MANAGEMENT_PREFIX = "/api/management";
-const PAGE_SIZE = 100;
+const ORGANIZATION_PAGE_SIZE = 50;
+const CALCULATION_PAGE_SIZE = 50;
 const MAX_PAGES = 100;
 
 export type WorkspaceOrganization = Readonly<{
@@ -68,6 +69,16 @@ function errorCode(status: number): string {
   return "request_failed";
 }
 
+function authorizedHeaders(token: string): Headers {
+  if (token.length < 16 || token.length > 512) {
+    throw new WorkspaceApiError(0, "invalid_session");
+  }
+  return new Headers({
+    Accept: "application/json",
+    Authorization: `Bearer ${token}`,
+  });
+}
+
 async function requestJson(
   path: string,
   options: Readonly<{
@@ -76,13 +87,7 @@ async function requestJson(
     body?: unknown;
   }> = {},
 ): Promise<unknown> {
-  const headers = new Headers({ Accept: "application/json" });
-  if (options.token !== undefined) {
-    if (options.token.length < 16 || options.token.length > 512) {
-      throw new WorkspaceApiError(0, "invalid_session");
-    }
-    headers.set("Authorization", `Bearer ${options.token}`);
-  }
+  const headers = options.token === undefined ? new Headers({ Accept: "application/json" }) : authorizedHeaders(options.token);
   let body: string | undefined;
   if (options.body !== undefined) {
     headers.set("Content-Type", "application/json");
@@ -173,10 +178,36 @@ export async function loginWorkspace(email: string, password: string): Promise<s
   return token;
 }
 
+export async function logoutWorkspace(token: string): Promise<void> {
+  const response = await fetch(`${MANAGEMENT_PREFIX}/auth/logout`, {
+    method: "POST",
+    headers: authorizedHeaders(token),
+    credentials: "omit",
+    cache: "no-store",
+    redirect: "error",
+    referrerPolicy: "no-referrer",
+  });
+  if (response.status !== 204) {
+    throw new WorkspaceApiError(response.status, errorCode(response.status));
+  }
+}
+
 export async function listWorkspaceOrganizations(token: string): Promise<readonly WorkspaceOrganization[]> {
-  const payload = await requestJson("/organizations", { token });
-  if (!Array.isArray(payload)) throw new WorkspaceApiError(502, "invalid_response");
-  return Object.freeze(payload.map(parseOrganization));
+  const organizations: WorkspaceOrganization[] = [];
+  const seenIds = new Set<string>();
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const offset = page * ORGANIZATION_PAGE_SIZE;
+    const payload = await requestJson(`/organizations?limit=${ORGANIZATION_PAGE_SIZE}&offset=${offset}`, { token });
+    if (!Array.isArray(payload)) throw new WorkspaceApiError(502, "invalid_response");
+    const parsed = payload.map(parseOrganization);
+    for (const organization of parsed) {
+      if (seenIds.has(organization.id)) throw new WorkspaceApiError(502, "invalid_response");
+      seenIds.add(organization.id);
+      organizations.push(organization);
+    }
+    if (parsed.length < ORGANIZATION_PAGE_SIZE) return Object.freeze(organizations);
+  }
+  throw new WorkspaceApiError(502, "organization_page_limit_exceeded");
 }
 
 export async function listWorkspaceEngines(token: string): Promise<readonly EngineSummary[]> {
@@ -193,9 +224,9 @@ export async function listCalculations(
   const calculations: CalculationSummary[] = [];
   const seenIds = new Set<string>();
   for (let page = 0; page < MAX_PAGES; page += 1) {
-    const offset = page * PAGE_SIZE;
+    const offset = page * CALCULATION_PAGE_SIZE;
     const payload = await requestJson(
-      `/organizations/${encodeURIComponent(organizationId)}/calculations?limit=${PAGE_SIZE}&offset=${offset}`,
+      `/organizations/${encodeURIComponent(organizationId)}/calculations?limit=${CALCULATION_PAGE_SIZE}&offset=${offset}`,
       { token },
     );
     if (!Array.isArray(payload)) throw new WorkspaceApiError(502, "invalid_response");
@@ -207,7 +238,7 @@ export async function listCalculations(
       seenIds.add(calculation.id);
       calculations.push(calculation);
     }
-    if (parsed.length < PAGE_SIZE) return Object.freeze(calculations);
+    if (parsed.length < CALCULATION_PAGE_SIZE) return Object.freeze(calculations);
   }
   throw new WorkspaceApiError(502, "calculation_page_limit_exceeded");
 }
