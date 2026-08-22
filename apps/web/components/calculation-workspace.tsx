@@ -9,6 +9,7 @@ import {
   listWorkspaceEngines,
   listWorkspaceOrganizations,
   loginWorkspace,
+  logoutWorkspace,
   type WorkspaceOrganization,
 } from "@/lib/calculation-workspace-api";
 import styles from "./calculation-workspace.module.css";
@@ -114,16 +115,26 @@ export function CalculationWorkspace() {
     }
   }
 
-  function logout() {
-    setToken(null);
-    setPassword("");
-    setOrganizations([]);
-    setEngines([]);
-    setOrganizationId("");
-    setCalculations([]);
-    setName("");
-    setEngineKey("");
-    setNotice({ kind: "info", text: "Yerel oturum bilgisi temizlendi." });
+  async function logout() {
+    if (token === null) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await logoutWorkspace(token);
+      setToken(null);
+      setPassword("");
+      setOrganizations([]);
+      setEngines([]);
+      setOrganizationId("");
+      setCalculations([]);
+      setName("");
+      setEngineKey("");
+      setNotice({ kind: "info", text: "Sunucu oturumu kapatıldı ve yerel oturum bilgisi temizlendi." });
+    } catch (error) {
+      setNotice({ kind: "error", text: friendlyError(error) });
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (token === null) {
@@ -160,7 +171,7 @@ export function CalculationWorkspace() {
           <p className={styles.kicker}>Tenant çalışma alanı</p>
           <h2 id="workspace-title">Hesaplamalar</h2>
         </div>
-        <button type="button" className={styles.secondary} onClick={logout}>Oturumu temizle</button>
+        <button type="button" className={styles.secondary} onClick={() => void logout()} disabled={busy}>Oturumu kapat</button>
       </div>
 
       <div className={styles.grid}>
