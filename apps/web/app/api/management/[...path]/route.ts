@@ -10,11 +10,25 @@ type RouteRule = Readonly<{
   pattern: RegExp;
   authenticated: boolean;
   allowDeploymentPagination?: boolean;
+  allowEmptyBody?: boolean;
 }>;
 
 const ROUTE_RULES: readonly RouteRule[] = Object.freeze([
   { method: "POST", pattern: /^auth\/login$/, authenticated: false },
-  { method: "GET", pattern: /^organizations$/, authenticated: true },
+  { method: "POST", pattern: /^auth\/logout$/, authenticated: true, allowEmptyBody: true },
+  { method: "GET", pattern: /^organizations$/, authenticated: true, allowDeploymentPagination: true },
+  { method: "GET", pattern: /^engines$/, authenticated: true },
+  {
+    method: "GET",
+    pattern: new RegExp(`^organizations/${UUID}/calculations$`),
+    authenticated: true,
+    allowDeploymentPagination: true,
+  },
+  {
+    method: "POST",
+    pattern: new RegExp(`^organizations/${UUID}/calculations$`),
+    authenticated: true,
+  },
   {
     method: "GET",
     pattern: new RegExp(`^organizations/${UUID}/widget-branding-profiles$`),
@@ -127,13 +141,18 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
 
   let body: string | undefined;
   if (request.method === "POST" || request.method === "PUT") {
-    body = await request.text();
-    if (Buffer.byteLength(body, "utf8") > MAX_BODY_BYTES) {
+    const candidateBody = await request.text();
+    if (Buffer.byteLength(candidateBody, "utf8") > MAX_BODY_BYTES) {
       return genericJson(413, "request too large");
     }
-    const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
-    if (contentType !== "application/json") {
-      return genericJson(415, "application/json required");
+    if (candidateBody.length === 0 && rule.allowEmptyBody) {
+      body = undefined;
+    } else {
+      const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+      if (contentType !== "application/json") {
+        return genericJson(415, "application/json required");
+      }
+      body = candidateBody;
     }
   }
 
@@ -159,6 +178,16 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     });
   } catch {
     return genericJson(502, "management upstream request failed");
+  }
+
+  if (upstream.status === 204) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
   }
 
   const responseContentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";

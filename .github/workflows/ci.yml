@@ -89,5 +89,7 @@ jobs:
         run: npm run widget:test
       - name: Widget branding management contract
         run: npm run management:test
+      - name: Calculation workspace contract
+        run: npm run calculation:test
       - name: Next.js build
         run: npm run build

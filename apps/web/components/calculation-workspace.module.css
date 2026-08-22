@@ -1,0 +1,138 @@
+.workspace {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.panel {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background: rgba(15, 23, 42, 0.62);
+  box-shadow: 0 1rem 3rem rgba(2, 6, 23, 0.16);
+}
+
+.panel h2,
+.panel h3 {
+  margin-top: 0;
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.form label,
+.panel label {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 700;
+}
+
+.form input,
+.form select,
+.panel select {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 0.7rem;
+  background: rgba(15, 23, 42, 0.88);
+  color: inherit;
+  padding: 0.78rem 0.85rem;
+  font: inherit;
+}
+
+.form button,
+.secondary {
+  border: 0;
+  border-radius: 0.7rem;
+  padding: 0.78rem 1rem;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.form button {
+  background: #f59e0b;
+  color: #111827;
+}
+
+.form button:disabled,
+.secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.secondary {
+  background: rgba(148, 163, 184, 0.16);
+  color: inherit;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.toolbar,
+.listHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.kicker {
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  opacity: 0.72;
+}
+
+.notice {
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border-radius: 0.7rem;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.list li div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.list li span,
+.list li time {
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar,
+  .list li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
