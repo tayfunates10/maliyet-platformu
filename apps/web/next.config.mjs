@@ -23,6 +23,14 @@ const nextConfig = {
         source: "/widget/v1.1.0/styles.css",
         headers: immutableWidgetHeaders,
       },
+      {
+        source: "/widget/v1.2.0/loader.js",
+        headers: immutableWidgetHeaders,
+      },
+      {
+        source: "/widget/v1.2.0/styles.css",
+        headers: immutableWidgetHeaders,
+      },
     ];
   },
   experimental: {
