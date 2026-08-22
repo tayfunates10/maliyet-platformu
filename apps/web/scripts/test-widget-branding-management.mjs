@@ -32,6 +32,10 @@ assert.doesNotMatch(apiClient, /https?:\/\//);
 
 assert.match(apiClient, /"\/auth\/login"/);
 assert.match(apiClient, /"\/organizations"/);
+assert.match(apiClient, /listWidgetDeployments/);
+assert.match(apiClient, /widget-deployments`/);
+assert.match(apiClient, /publishable/);
+assert.match(apiClient, /source_revoked_at/);
 assert.match(apiClient, /widget-branding-profiles/);
 assert.match(apiClient, /widget-deployments\/\$\{encodeURIComponent\(deploymentId\)\}\/presentation/);
 assert.match(apiClient, /body:\s*\{ branding_profile_id: profileId \}/);
@@ -44,6 +48,7 @@ assert.match(managementProxy, /const ROUTE_RULES/);
 assert.match(managementProxy, /\^auth\\\/login\$/);
 assert.match(managementProxy, /\^organizations\$/);
 assert.match(managementProxy, /widget-branding-profiles/);
+assert.match(managementProxy, /widget-deployments/);
 assert.match(managementProxy, /widget-deployments\/\$\{UUID\}\/presentation/);
 assert.match(managementProxy, /request\.nextUrl\.search !== ""/);
 assert.match(managementProxy, /MAX_BODY_BYTES = 16_384/);
@@ -63,9 +68,17 @@ assert.doesNotMatch(manager, /\{token\}/);
 assert.doesNotMatch(manager, /useEffect/);
 assert.match(manager, /const \[dirty, setDirty\] = useState\(false\)/);
 assert.match(manager, /const \[confirmPublish, setConfirmPublish\] = useState\(false\)/);
+assert.match(manager, /const \[deployments, setDeployments\]/);
+assert.match(manager, /listWidgetDeployments\s*\(/);
+assert.match(manager, /Promise\.all/);
+assert.match(manager, /selectedDeployment/);
+assert.match(manager, /selectedDeployment\.publishable/);
+assert.match(manager, /disabled=\{!deployment\.publishable\}/);
+assert.match(manager, /Deployment seçin/);
+assert.doesNotMatch(manager, /Widget deployment UUID/);
+assert.doesNotMatch(manager, /placeholder="[0-9a-f-]{36}"/i);
 assert.match(manager, /if \(dirty\)/);
 assert.match(manager, /if \(!confirmPublish\)/);
-assert.match(manager, /!isDeploymentId\(deploymentId\)/);
 assert.match(manager, /Canlı presentation'ı yayınla/);
 assert.match(manager, /Kaydetme işlemi canlı widget'ı değiştirmez/);
 
@@ -82,6 +95,8 @@ const publishBody = manager.slice(publishStart, manager.indexOf("function logout
 assert.match(publishBody, /publishBrandingProfile\s*\(/);
 assert.match(publishBody, /confirmPublish/);
 assert.match(publishBody, /dirty/);
+assert.match(publishBody, /selectedDeployment/);
+assert.match(publishBody, /publishable/);
 
 assert.match(managementPage, /WidgetBrandingManager/);
 assert.match(managementPage, /Taslak kaydetme ve canlı presentation yayınlama ayrı işlemlerdir/);
