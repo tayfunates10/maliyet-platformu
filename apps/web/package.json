@@ -12,7 +12,7 @@
     "lint": "biome lint .",
     "typecheck": "tsc --noEmit",
     "contract": "node scripts/check-contract.mjs",
-    "widget:test": "node scripts/test-widget-loader.mjs"
+    "widget:test": "node scripts/test-widget-loader.mjs && node scripts/test-widget-theme-config.mjs"
   },
   "dependencies": {
     "next": "16.3.0",
