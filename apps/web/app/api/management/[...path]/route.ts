@@ -15,6 +15,18 @@ type RouteRule = Readonly<{
 const ROUTE_RULES: readonly RouteRule[] = Object.freeze([
   { method: "POST", pattern: /^auth\/login$/, authenticated: false },
   { method: "GET", pattern: /^organizations$/, authenticated: true },
+  { method: "GET", pattern: /^engines$/, authenticated: true },
+  {
+    method: "GET",
+    pattern: new RegExp(`^organizations/${UUID}/calculations$`),
+    authenticated: true,
+    allowDeploymentPagination: true,
+  },
+  {
+    method: "POST",
+    pattern: new RegExp(`^organizations/${UUID}/calculations$`),
+    authenticated: true,
+  },
   {
     method: "GET",
     pattern: new RegExp(`^organizations/${UUID}/widget-branding-profiles$`),
