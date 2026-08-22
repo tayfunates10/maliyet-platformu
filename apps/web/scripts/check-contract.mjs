@@ -11,6 +11,8 @@ const requiredFiles = [
   "app/globals.css",
   "lib/sectors.ts",
   "lib/runtime-config.ts",
+  "public/widget/v1.0.0/loader.js",
+  "scripts/test-widget-loader.mjs",
   "biome.json",
   "tsconfig.json",
   ".env.example",
@@ -42,9 +44,18 @@ if (packageJson.devDependencies["@biomejs/biome"] !== "2.5.6") {
   throw new Error("Web linting must remain on the reviewed Biome version");
 }
 
+if (packageJson.scripts["widget:test"] !== "node scripts/test-widget-loader.mjs") {
+  throw new Error("Widget SDK security contract test must remain wired into the web package");
+}
+
 const nextConfig = readFileSync(resolve(root, "next.config.mjs"), "utf8");
 if (!nextConfig.includes("useTypeScriptCli: true")) {
   throw new Error("Next.js must use the TypeScript CLI for TypeScript 7 compatibility");
+}
+
+const widgetLoader = readFileSync(resolve(root, "public/widget/v1.0.0/loader.js"), "utf8");
+if (!widgetLoader.includes('const SDK_VERSION = "1.0.0"')) {
+  throw new Error("Widget v1.0.0 asset must self-identify as version 1.0.0");
 }
 
 const sectorsSource = readFileSync(resolve(root, "lib/sectors.ts"), "utf8");

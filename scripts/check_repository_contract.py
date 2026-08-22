@@ -33,8 +33,10 @@ REQUIRED_FILES = (
     "docs/adr/0021-tax-profile-onboarding.md",
     "docs/adr/0022-public-calculation-projection.md",
     "docs/adr/0023-widget-origin-quota-security.md",
+    "docs/adr/0024-widget-sdk-public-integration.md",
     "docs/data-sources/turkiye-authoritative-sources.md",
     "docs/engineering/pr-quality-gates.md",
+    "docs/integrations/widget-v1.md",
     ".github/pull_request_template.md",
     "data/tr/2026/README.md",
     "data/tr/2026/baseline.json",
@@ -116,7 +118,9 @@ REQUIRED_FILES = (
     "services/api/tests/test_widget_security_api.py",
     "apps/web/package.json",
     "apps/web/app/page.tsx",
+    "apps/web/public/widget/v1.0.0/loader.js",
     "apps/web/scripts/check-contract.mjs",
+    "apps/web/scripts/test-widget-loader.mjs",
 )
 
 AGENT_GUARDRAILS = (
@@ -131,6 +135,9 @@ AGENT_GUARDRAILS = (
     "Internationalized widget hostname'leri browser URL davranışıyla uyumlu non-transitional UTS #46",
     "Widget Origin kontrolü authentication değildir",
     "Widget kullanım kotası process-local sayaçla uygulanmaz",
+    "Widget SDK browser içine formül, API key, bearer token veya tenant secret gömemez",
+    "Widget projection fetch'i custom auth header göndermeyen basit CORS GET'i olarak kalır",
+    "Public widget SDK version path'i yayınlandıktan sonra immutable kabul edilir",
     "Parolalar plaintext, reversible encryption veya hızlı genel amaçlı hash ile saklanmaz",
     "Raw bearer/session token veritabanında saklanmaz.",
     "Organization bootstrap sırasında owner/creator/role kimliği request body'den seçilemez",
@@ -146,6 +153,8 @@ AGENT_GUARDRAILS = (
     "Logout caller'dan session ID kabul etmez",
     "Widget deployment yalnız aynı tenant'a ait aktif public projection'a bağlanabilir",
     "Widget quota rezervasyonu PostgreSQL atomic upsert/conditional update gibi tek atomik storage işlemiyle yapılır",
+    "Widget SDK server metnini DOM'a executable HTML olarak yazmaz",
+    "Public loader asset'indeki wildcard CORS yalnız static SDK dağıtımı içindir",
 )
 
 

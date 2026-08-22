@@ -29,6 +29,9 @@ E-ticaret bir NACE sektörü gibi modellenmez; satış kanalı/operasyon modeli 
 - Internationalized widget hostname'leri browser URL davranışıyla uyumlu non-transitional UTS #46 ASCII canonicalization kullanır; legacy IDNA 2003 eşlemelerine geri dönülemez.
 - Widget Origin kontrolü authentication değildir; taklit edilebilir Origin hiçbir koşulda customer-safe public projection sınırını aşarak internal snapshot, maliyet, kâr, marj veya ruleset verisine erişim sağlamaz.
 - Widget kullanım kotası process-local sayaçla uygulanmaz; tenant-bound persistent storage üzerinde atomik olarak ayrılır ve eşzamanlı isteklerde limiti aşamaz.
+- Widget SDK browser içine formül, API key, bearer token veya tenant secret gömemez; yalnız public deployment ID ve customer-safe projection kullanır.
+- Widget projection fetch'i custom auth header göndermeyen basit CORS GET'i olarak kalır; browser credentials göndermez.
+- Public widget SDK version path'i yayınlandıktan sonra immutable kabul edilir; düzeltme yeni semver path ile çıkarılır.
 - Parolalar plaintext, reversible encryption veya hızlı genel amaçlı hash ile saklanmaz; versioned memory-hard password hashing zorunludur.
 - Raw bearer/session token veritabanında saklanmaz.
 - Organization bootstrap sırasında owner/creator/role kimliği request body'den seçilemez; ilk owner authenticated server identity'dir.
@@ -91,6 +94,8 @@ Her PR açıklaması en az şunları içerir:
 - Allowed-origin registry mutation'ları eşzamanlı yönetim isteklerinde deployment row lock altında seri hale getirilir.
 - Widget quota rezervasyonu PostgreSQL atomic upsert/conditional update gibi tek atomik storage işlemiyle yapılır; read-then-write sayaç deseni yasaktır.
 - Public widget response'u yalnız public projection allowlist alanlarını döndürür; deployment/organization/projection iç kimlikleri veya private source snapshot alanları response'a eklenmez.
+- Widget SDK server metnini DOM'a executable HTML olarak yazmaz; customer-safe alanlar `textContent`/DOM API ile render edilir.
+- Public loader asset'indeki wildcard CORS yalnız static SDK dağıtımı içindir; finansal API endpoint'lerinin exact-origin CORS politikası gevşetilemez.
 
 ## 7. Devralma sırası
 
