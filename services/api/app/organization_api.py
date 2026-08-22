@@ -23,11 +23,15 @@ from app.organization_onboarding import (
 from app.public_projection_api import public_router as public_projection_public_router
 from app.public_projection_api import tenant_router as public_projection_tenant_router
 from app.tax_profile_api import router as tax_profile_router
+from app.widget_api import public_router as widget_public_router
+from app.widget_api import tenant_router as widget_tenant_router
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 router.include_router(tax_profile_router)
 router.include_router(public_projection_tenant_router)
 router.include_router(public_projection_public_router)
+router.include_router(widget_tenant_router)
+router.include_router(widget_public_router)
 
 
 class OrganizationCreateRequest(BaseModel):

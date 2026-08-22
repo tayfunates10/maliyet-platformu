@@ -24,6 +24,11 @@ E-ticaret bir NACE sektörü gibi modellenmez; satış kanalı/operasyon modeli 
 - Public projection hiçbir zaman internal `input_snapshot`, `ruleset_snapshot`, `output_snapshot`, maliyet, kâr veya marj alanlarını otomatik olarak yayınlayamaz; response explicit allowlist olmak zorundadır.
 - Public share token raw olarak veritabanında saklanmaz; yalnız güçlü digest saklanır ve revoke sonrası public erişim fail-closed olmalıdır.
 - Public projection oluşturma/revoke yetkisi yalnız authenticated `owner` ve `admin` rollerine aittir.
+- Widget browser içine gizli kabul edilen API key/client secret gömemez; browser deployment kimliği public olabilir fakat yetki veya özel finansal veriye erişim sağlamaz.
+- Widget Origin allowlist yalnız exact HTTPS DNS origin kabul eder; wildcard, HTTP, IP literal, path/query/fragment ve `Referer` tabanlı yetkilendirme yasaktır.
+- Internationalized widget hostname'leri browser URL davranışıyla uyumlu non-transitional UTS #46 ASCII canonicalization kullanır; legacy IDNA 2003 eşlemelerine geri dönülemez.
+- Widget Origin kontrolü authentication değildir; taklit edilebilir Origin hiçbir koşulda customer-safe public projection sınırını aşarak internal snapshot, maliyet, kâr, marj veya ruleset verisine erişim sağlamaz.
+- Widget kullanım kotası process-local sayaçla uygulanmaz; tenant-bound persistent storage üzerinde atomik olarak ayrılır ve eşzamanlı isteklerde limiti aşamaz.
 - Parolalar plaintext, reversible encryption veya hızlı genel amaçlı hash ile saklanmaz; versioned memory-hard password hashing zorunludur.
 - Raw bearer/session token veritabanında saklanmaz.
 - Organization bootstrap sırasında owner/creator/role kimliği request body'den seçilemez; ilk owner authenticated server identity'dir.
@@ -82,6 +87,10 @@ Her PR açıklaması en az şunları içerir:
 - `tax_rate`, bracket, threshold veya actor/role override alanları TaxProfile HTTP payload'ına eklenemez.
 - Public projection kaynağı provenance digest'leri tamamlanmış immutable CalculationVersion olmak zorundadır.
 - Public projection immutable'dır; müşteri görünür sonucu değiştirmek için yeni projection oluşturulur, eski projection yalnız revoke edilir.
+- Widget deployment yalnız aynı tenant'a ait aktif public projection'a bağlanabilir; bu sınır composite database foreign key ile de korunur.
+- Allowed-origin registry mutation'ları eşzamanlı yönetim isteklerinde deployment row lock altında seri hale getirilir.
+- Widget quota rezervasyonu PostgreSQL atomic upsert/conditional update gibi tek atomik storage işlemiyle yapılır; read-then-write sayaç deseni yasaktır.
+- Public widget response'u yalnız public projection allowlist alanlarını döndürür; deployment/organization/projection iç kimlikleri veya private source snapshot alanları response'a eklenmez.
 
 ## 7. Devralma sırası
 
