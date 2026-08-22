@@ -28,7 +28,8 @@ assert.match(apiClient, /referrerPolicy:\s*"no-referrer"/);
 assert.match(apiClient, /headers\.set\("Authorization", `Bearer \$\{options\.token\}`\)/);
 assert.doesNotMatch(apiClient, /response\.text\s*\(/);
 assert.doesNotMatch(apiClient, /response\.statusText/);
-assert.doesNotMatch(apiClient, /https?:\/\//);
+assert.doesNotMatch(apiClient, /fetch\(\s*["'`]https?:\/\//);
+assert.match(apiClient, /origin\.startsWith\("https:\/\/"\)/);
 
 assert.match(apiClient, /"\/auth\/login"/);
 assert.match(apiClient, /"\/organizations"/);
