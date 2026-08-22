@@ -27,7 +27,7 @@ export function CalculationResultSummary({ snapshot }: Props) {
   return (
     <dl className={styles.resultSummary}>
       {entries.map(([key, value]) => (
-        <div key={key}>
+        <div key={key} className={styles.resultSummaryItem}>
           <dt>{humanize(key)}</dt>
           <dd>{value}</dd>
         </div>
