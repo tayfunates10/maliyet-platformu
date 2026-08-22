@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -21,6 +22,7 @@ from app.models import (
     OrganizationMembership,
     PublicCalculationProjection,
     User,
+    WidgetUsageBucket,
 )
 from app.widget_api import WidgetDeploymentResponse
 from app.widget_branding_models import (
@@ -232,6 +234,13 @@ def test_profile_update_does_not_change_public_snapshot_until_republish(
     assert first_payload["presentation"]["theme"] == "light"
     assert first_payload["presentation"]["light_background_color"] == "#112233"
     assert first_payload["presentation"]["border_radius_px"] == 8
+    usage = app_db_session.scalar(
+        select(WidgetUsageBucket).where(
+            WidgetUsageBucket.widget_deployment_id == deployment.id
+        )
+    )
+    assert usage is not None
+    assert usage.request_count == 1
     assert _PRIVATE_SENTINEL not in first_public.text
     assert str(organization.id) not in first_public.text
     assert str(profile["id"]) not in first_public.text
@@ -335,9 +344,7 @@ def test_profile_rejects_arbitrary_presentation_inputs(
     )
 
     assert response.status_code == 422
-    assert app_db_session.scalar(
-        select(func.count()).select_from(WidgetBrandingProfile)
-    ) == 0
+    assert app_db_session.scalar(select(func.count()).select_from(WidgetBrandingProfile)) == 0
 
 
 def test_non_admin_cannot_manage_branding_profiles(app_db_session: Session) -> None:
@@ -360,9 +367,38 @@ def test_non_admin_cannot_manage_branding_profiles(app_db_session: Session) -> N
 
     assert create_response.status_code == 403
     assert list_response.status_code == 403
-    assert app_db_session.scalar(
-        select(func.count()).select_from(WidgetBrandingProfile)
-    ) == 0
+    assert app_db_session.scalar(select(func.count()).select_from(WidgetBrandingProfile)) == 0
+
+
+def test_revoked_projection_blocks_branding_publication(app_db_session: Session) -> None:
+    _, organization, projection, token = _tenant_projection(
+        app_db_session,
+        suffix="revoked",
+    )
+    client = TestClient(app)
+    deployment = _create_deployment(
+        client,
+        organization=organization,
+        projection=projection,
+        token=token,
+    )
+    profile = _create_profile(
+        client,
+        organization=organization,
+        token=token,
+    )
+    projection.revoked_at = datetime.now(UTC)
+    app_db_session.flush()
+
+    response = client.post(
+        f"/organizations/{organization.id}/widget-deployments/{deployment.id}/presentation",
+        headers=_headers(token),
+        json={"branding_profile_id": profile["id"]},
+    )
+
+    assert response.status_code == 404
+    assert app_db_session.get(WidgetPublishedPresentation, deployment.id) is None
+    assert app_db_session.scalar(select(func.count()).select_from(WidgetPresentationSnapshot)) == 0
 
 
 def test_cross_tenant_profile_cannot_be_published_to_deployment(
@@ -399,7 +435,7 @@ def test_cross_tenant_profile_cannot_be_published_to_deployment(
 def test_database_rejects_cross_tenant_published_snapshot_pointer(
     app_db_session: Session,
 ) -> None:
-    _, organization_a, projection_a, token_a = _tenant_projection(
+    user_a, organization_a, projection_a, token_a = _tenant_projection(
         app_db_session,
         suffix="db-a",
     )
@@ -432,19 +468,40 @@ def test_database_rejects_cross_tenant_published_snapshot_pointer(
         profile_id=str(profile_a["id"]),
         token=token_a,
     )
-    snapshot_a = app_db_session.scalar(
+    published_snapshot_a = app_db_session.scalar(
         select(WidgetPresentationSnapshot).where(
             WidgetPresentationSnapshot.organization_id == organization_a.id
         )
     )
-    assert snapshot_a is not None
+    assert published_snapshot_a is not None
+    unreferenced_snapshot_a = WidgetPresentationSnapshot(
+        organization_id=organization_a.id,
+        branding_profile_id=UUID(str(profile_a["id"])),
+        created_by_user_id=user_a.id,
+        profile_revision=1,
+        theme=published_snapshot_a.theme,
+        locale=published_snapshot_a.locale,
+        density=published_snapshot_a.density,
+        show_title=published_snapshot_a.show_title,
+        light_background_color=published_snapshot_a.light_background_color,
+        light_text_color=published_snapshot_a.light_text_color,
+        light_border_color=published_snapshot_a.light_border_color,
+        dark_background_color=published_snapshot_a.dark_background_color,
+        dark_text_color=published_snapshot_a.dark_text_color,
+        dark_border_color=published_snapshot_a.dark_border_color,
+        error_color=published_snapshot_a.error_color,
+        border_radius_px=published_snapshot_a.border_radius_px,
+        font_family=published_snapshot_a.font_family,
+    )
+    app_db_session.add(unreferenced_snapshot_a)
+    app_db_session.flush()
 
     forged = WidgetPublishedPresentation(
         widget_deployment_id=deployment_b.id,
         organization_id=organization_b.id,
-        presentation_snapshot_id=snapshot_a.id,
+        presentation_snapshot_id=unreferenced_snapshot_a.id,
         published_by_user_id=user_b.id,
-        published_at=snapshot_a.created_at,
+        published_at=published_snapshot_a.created_at,
     )
     app_db_session.add(forged)
     with pytest.raises(IntegrityError):
