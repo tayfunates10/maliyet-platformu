@@ -6,6 +6,8 @@ const LOCALES = new Set(["tr", "en"]);
 const DENSITIES = new Set(["comfortable", "compact"]);
 const FONT_FAMILIES = new Set(["system", "sans", "serif", "monospace"]);
 const MANAGEMENT_PREFIX = "/api/management";
+const DEPLOYMENT_PAGE_SIZE = 100;
+const MAX_DEPLOYMENT_PAGES = 100;
 
 export type WidgetTheme = "auto" | "light" | "dark";
 export type WidgetLocale = "tr" | "en";
@@ -326,12 +328,24 @@ export async function listWidgetDeployments(
   organizationId: string,
 ): Promise<readonly WidgetDeploymentSummary[]> {
   if (!UUID_PATTERN.test(organizationId)) throw new ManagementApiError(0, "invalid_organization");
-  const payload = await requestJson(
-    `/organizations/${encodeURIComponent(organizationId)}/widget-deployments`,
-    { token },
-  );
-  if (!Array.isArray(payload)) throw new ManagementApiError(502, "invalid_response");
-  return Object.freeze(payload.map(parseDeployment));
+  const deployments: WidgetDeploymentSummary[] = [];
+  const seenIds = new Set<string>();
+  for (let page = 0; page < MAX_DEPLOYMENT_PAGES; page += 1) {
+    const offset = page * DEPLOYMENT_PAGE_SIZE;
+    const payload = await requestJson(
+      `/organizations/${encodeURIComponent(organizationId)}/widget-deployments?limit=${DEPLOYMENT_PAGE_SIZE}&offset=${offset}`,
+      { token },
+    );
+    if (!Array.isArray(payload)) throw new ManagementApiError(502, "invalid_response");
+    const parsed = payload.map(parseDeployment);
+    for (const deployment of parsed) {
+      if (seenIds.has(deployment.id)) throw new ManagementApiError(502, "invalid_response");
+      seenIds.add(deployment.id);
+      deployments.push(deployment);
+    }
+    if (parsed.length < DEPLOYMENT_PAGE_SIZE) return Object.freeze(deployments);
+  }
+  throw new ManagementApiError(502, "deployment_page_limit_exceeded");
 }
 
 export async function listBrandingProfiles(
