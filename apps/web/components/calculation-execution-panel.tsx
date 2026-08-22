@@ -10,6 +10,8 @@ import {
 } from "@/lib/calculation-execution-api";
 import type { CalculationSummary, EngineSummary } from "@/lib/calculation-workspace-api";
 import { buildSchemaTemplate, listRequiredFields } from "@/lib/json-schema-template";
+import { CalculationResultSummary } from "./calculation-result-summary";
+import { SchemaFieldEditor } from "./schema-field-editor";
 import styles from "./calculation-workspace.module.css";
 
 type Props = Readonly<{
@@ -22,8 +24,9 @@ type Props = Readonly<{
 
 type Notice = Readonly<{ kind: "error" | "success" | "info"; text: string }> | null;
 
+type JsonObject = Readonly<Record<string, unknown>>;
+
 function friendlyError(error: unknown): string {
-  if (error instanceof SyntaxError) return "Girdi geçerli JSON olmalıdır.";
   if (error instanceof Error) {
     if (error.message === "authentication_required") return "Oturum doğrulanamadı.";
     if (error.message === "access_denied") return "Bu işlem için yetkiniz yok.";
@@ -39,7 +42,8 @@ function pretty(value: unknown): string {
 }
 
 export function CalculationExecutionPanel({ token, organizationId, calculation, engine, canWrite }: Props) {
-  const [inputText, setInputText] = useState("");
+  const [inputSchema, setInputSchema] = useState<JsonObject | null>(null);
+  const [inputValue, setInputValue] = useState<JsonObject | null>(null);
   const [requiredFields, setRequiredFields] = useState<readonly string[]>([]);
   const [execution, setExecution] = useState<CalculationExecution | null>(null);
   const [latestVersion, setLatestVersion] = useState<CalculationVersion | null>(null);
@@ -54,11 +58,14 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
       const detail = await getEngineDetail(token, engine.key);
       if (detail.engine_version !== engine.engine_version) throw new Error("engine_version_mismatch");
       const template = buildSchemaTemplate(detail.input_schema);
-      setInputText(pretty(template));
+      setInputSchema(detail.input_schema);
+      setInputValue(template);
       setRequiredFields(listRequiredFields(detail.input_schema));
       setSchemaLoaded(true);
-      setNotice({ kind: "info", text: "Motor şeması yüklendi. Decimal alanları JSON sayı değil metin olarak girilmelidir." });
+      setNotice({ kind: "info", text: "Motor şeması yüklendi. Decimal alanları sayı değil metin olarak tutulur ve backend doğrulamasına gönderilir." });
     } catch (error) {
+      setInputSchema(null);
+      setInputValue(null);
       setSchemaLoaded(false);
       setNotice({ kind: "error", text: friendlyError(error) });
     } finally {
@@ -82,18 +89,16 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
 
   async function handleExecute(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canWrite || !schemaLoaded) return;
+    if (!canWrite || !schemaLoaded || inputValue === null) return;
     setBusy(true);
     setNotice(null);
     try {
-      const parsed: unknown = JSON.parse(inputText);
-      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new SyntaxError("object required");
       const result = await executeCalculation(
         token,
         organizationId,
         calculation.id,
         engine.key,
-        parsed as Readonly<Record<string, unknown>>,
+        inputValue,
       );
       setExecution(result);
       setLatestVersion(null);
@@ -118,24 +123,24 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
       </div>
 
       <p><strong>{calculation.name}</strong> için input şeması backend allowlist’inden alınır; tarayıcı finansal formül çalıştırmaz.</p>
-      {!schemaLoaded ? (
+      {!schemaLoaded || inputSchema === null || inputValue === null ? (
         <button type="button" className={styles.secondary} onClick={() => void loadSchema()} disabled={busy || !canWrite}>
           {busy ? "Yükleniyor…" : "Motor formunu hazırla"}
         </button>
       ) : (
         <form className={styles.form} onSubmit={handleExecute}>
           {requiredFields.length > 0 ? <p className={styles.kicker}>Zorunlu üst alanlar: {requiredFields.join(", ")}</p> : null}
-          <label>
-            Motor girdisi (JSON)
-            <textarea
-              rows={18}
-              spellCheck={false}
-              value={inputText}
-              onChange={(event) => setInputText(event.target.value)}
-              disabled={!canWrite || busy}
-            />
-          </label>
-          <button type="submit" disabled={!canWrite || busy || inputText.trim() === ""}>
+          <SchemaFieldEditor
+            schema={inputSchema}
+            value={inputValue}
+            disabled={!canWrite || busy}
+            onChange={setInputValue}
+          />
+          <details className={styles.jsonPreview}>
+            <summary>Gönderilecek JSON önizlemesi</summary>
+            <pre>{pretty(inputValue)}</pre>
+          </details>
+          <button type="submit" disabled={!canWrite || busy}>
             {busy ? "Çalıştırılıyor…" : "Hesapla ve sürüm kaydet"}
           </button>
         </form>
@@ -147,8 +152,12 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
       {execution !== null ? (
         <div className={styles.result}>
           <h4>Yeni sürüm #{execution.version}</h4>
+          <CalculationResultSummary snapshot={execution.output_snapshot} />
           <p>Output SHA-256: <code>{execution.output_sha256}</code></p>
-          <pre>{pretty(execution.output_snapshot)}</pre>
+          <details className={styles.jsonPreview}>
+            <summary>Tam output snapshot</summary>
+            <pre>{pretty(execution.output_snapshot)}</pre>
+          </details>
         </div>
       ) : null}
 
@@ -156,8 +165,12 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
         <div className={styles.result}>
           <h4>Kayıtlı sürüm #{latestVersion.version}</h4>
           <p>Engine: {latestVersion.engine_key ?? "legacy"} · {latestVersion.engine_version}</p>
+          <CalculationResultSummary snapshot={latestVersion.output_snapshot} />
           {latestVersion.output_sha256 !== null ? <p>Output SHA-256: <code>{latestVersion.output_sha256}</code></p> : null}
-          <pre>{pretty(latestVersion.output_snapshot)}</pre>
+          <details className={styles.jsonPreview}>
+            <summary>Tam output snapshot</summary>
+            <pre>{pretty(latestVersion.output_snapshot)}</pre>
+          </details>
         </div>
       ) : null}
     </div>
