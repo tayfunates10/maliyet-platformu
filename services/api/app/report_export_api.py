@@ -19,6 +19,7 @@ from app.report_export import (
     build_calculation_report_docx,
     build_calculation_report_xlsx,
 )
+from app.report_export_pdf import build_calculation_report_pdf
 
 router = APIRouter(tags=["reports"])
 
@@ -184,6 +185,39 @@ def export_calculation_report_docx(
     return Response(
         content=report,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get(
+    "/{organization_id}/calculations/{calculation_id}/versions/{version_number}/report.pdf",
+    response_class=Response,
+)
+def export_calculation_report_pdf(
+    organization_id: UUID,
+    calculation_id: UUID,
+    version_number: int,
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    session: Annotated[Session, Depends(get_database_session)],
+) -> Response:
+    """Download one immutable version as a deterministic PDF report."""
+
+    calculation, version = _validated_report_source(
+        session,
+        identity=identity,
+        organization_id=organization_id,
+        calculation_id=calculation_id,
+        version_number=version_number,
+    )
+    report = build_calculation_report_pdf(calculation, version)
+    filename = f"calculation-{calculation.id}-v{version.version}.pdf"
+    return Response(
+        content=report,
+        media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-store",
