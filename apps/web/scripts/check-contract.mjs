@@ -22,6 +22,7 @@ const requiredFiles = [
   "public/widget/v1.1.0/styles.css",
   "public/widget/v1.2.0/loader.js",
   "public/widget/v1.2.0/styles.css",
+  "scripts/test-runtime-config.mjs",
   "scripts/test-widget-loader.mjs",
   "scripts/test-widget-theme-config.mjs",
   "scripts/test-widget-published-branding.mjs",
@@ -57,6 +58,10 @@ if (packageJson.devDependencies["@biomejs/biome"] !== "2.5.6") {
   throw new Error("Web linting must remain on the reviewed Biome version");
 }
 
+if (packageJson.scripts["runtime:test"] !== "node scripts/test-runtime-config.mjs") {
+  throw new Error("Production runtime configuration contract must run in CI");
+}
+
 if (
   packageJson.scripts["widget:test"] !==
   "node scripts/test-widget-loader.mjs && node scripts/test-widget-theme-config.mjs && node scripts/test-widget-published-branding.mjs"
@@ -66,6 +71,14 @@ if (
 
 if (packageJson.scripts["management:test"] !== "node scripts/test-widget-branding-management.mjs") {
   throw new Error("Authenticated widget branding management contract must run in CI");
+}
+
+const runtimeConfig = readFileSync(resolve(root, "lib/runtime-config.ts"), "utf8");
+if (!runtimeConfig.includes('process.env.NODE_ENV === "production"')) {
+  throw new Error("Production API base configuration must fail closed when missing");
+}
+if (!runtimeConfig.includes('url.protocol !== "https:"')) {
+  throw new Error("Production API base configuration must enforce HTTPS");
 }
 
 const nextConfig = readFileSync(resolve(root, "next.config.mjs"), "utf8");
