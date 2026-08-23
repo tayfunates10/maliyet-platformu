@@ -76,6 +76,25 @@ def test_ratio_results_ignore_caller_decimal_context() -> None:
     assert low_precision_scenarios[0].profit_margin_ratio == expected_ratio
 
 
+def test_large_scenario_subtraction_ignores_caller_decimal_context() -> None:
+    cases = (
+        ScenarioCase("pessimistic", Decimal("1e120"), Decimal("1")),
+        ScenarioCase("normal", Decimal("2e120"), Decimal("1")),
+        ScenarioCase("optimistic", Decimal("3e120"), Decimal("1")),
+    )
+
+    with localcontext() as context:
+        context.prec = 5
+        low_precision = calculate_scenarios(cases)
+
+    with localcontext() as context:
+        context.prec = 50
+        high_precision = calculate_scenarios(cases)
+
+    assert low_precision == high_precision
+    assert low_precision[0].profit == Decimal("1e120") - Decimal("1")
+
+
 def test_negative_returns_are_preserved() -> None:
     metrics = calculate_investment_metrics(
         InvestmentMetricInputs(
@@ -196,6 +215,7 @@ def test_snapshot_preserves_decimal_strings_and_policy_boundaries() -> None:
     assert policy == {
         "ratio_precision": 38,
         "ratio_rounding": "ROUND_HALF_EVEN",
+        "arithmetic_precision": 256,
         "tax_rate_inferred": False,
         "financing_mix_inferred": False,
         "inflation_inferred": False,
