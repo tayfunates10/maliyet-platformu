@@ -14,7 +14,11 @@ from app.calculation_orchestration import (
 )
 from app.http_dependencies import get_authenticated_identity, get_database_session
 from app.models import Calculation, CalculationVersion
-from app.report_export import build_calculation_report_csv, build_calculation_report_xlsx
+from app.report_export import (
+    build_calculation_report_csv,
+    build_calculation_report_docx,
+    build_calculation_report_xlsx,
+)
 
 router = APIRouter(tags=["reports"])
 
@@ -147,6 +151,39 @@ def export_calculation_report_xlsx(
     return Response(
         content=report,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get(
+    "/{organization_id}/calculations/{calculation_id}/versions/{version_number}/report.docx",
+    response_class=Response,
+)
+def export_calculation_report_docx(
+    organization_id: UUID,
+    calculation_id: UUID,
+    version_number: int,
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    session: Annotated[Session, Depends(get_database_session)],
+) -> Response:
+    """Download one immutable version as a deterministic DOCX report."""
+
+    calculation, version = _validated_report_source(
+        session,
+        identity=identity,
+        organization_id=organization_id,
+        calculation_id=calculation_id,
+        version_number=version_number,
+    )
+    report = build_calculation_report_docx(calculation, version)
+    filename = f"calculation-{calculation.id}-v{version.version}.docx"
+    return Response(
+        content=report,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-store",
