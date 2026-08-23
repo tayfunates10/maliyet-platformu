@@ -67,11 +67,32 @@ def _tenant(
     session: Session,
     *,
     suffix: str,
-    role: str = "owner",
 ) -> tuple[User, Organization, str]:
     user = User(email=f"docx-{suffix}@example.test", display_name=f"DOCX {suffix}")
     organization = Organization(slug=f"docx-{suffix}", legal_name=f"DOCX {suffix} Org")
     session.add_all([user, organization])
+    session.flush()
+    session.add(
+        OrganizationMembership(
+            organization_id=organization.id,
+            user_id=user.id,
+            role="owner",
+        )
+    )
+    session.flush()
+    _, raw_token = issue_session(session, user_id=user.id)
+    return user, organization, raw_token
+
+
+def _add_member(
+    session: Session,
+    *,
+    organization: Organization,
+    suffix: str,
+    role: str,
+) -> str:
+    user = User(email=f"docx-{suffix}@example.test", display_name=f"DOCX {suffix}")
+    session.add(user)
     session.flush()
     session.add(
         OrganizationMembership(
@@ -82,7 +103,7 @@ def _tenant(
     )
     session.flush()
     _, raw_token = issue_session(session, user_id=user.id)
-    return user, organization, raw_token
+    return raw_token
 
 
 def _headers(raw_token: str) -> dict[str, str]:
@@ -91,15 +112,12 @@ def _headers(raw_token: str) -> dict[str, str]:
 
 def test_authorized_viewer_can_download_docx(app_db_session: Session) -> None:
     owner, organization, owner_token = _tenant(app_db_session, suffix="owner")
-    viewer, _, viewer_token = _tenant(app_db_session, suffix="viewer", role="viewer")
-    app_db_session.add(
-        OrganizationMembership(
-            organization_id=organization.id,
-            user_id=viewer.id,
-            role="viewer",
-        )
+    viewer_token = _add_member(
+        app_db_session,
+        organization=organization,
+        suffix="viewer",
+        role="viewer",
     )
-    app_db_session.flush()
 
     calculation = Calculation(
         organization_id=organization.id,
