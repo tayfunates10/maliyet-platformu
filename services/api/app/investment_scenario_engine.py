@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Context, Decimal, localcontext
 
 ENGINE_VERSION = "investment-scenario-v1"
 ZERO = Decimal("0")
 SCENARIO_KEYS = ("pessimistic", "normal", "optimistic")
+RATIO_PRECISION = 38
+RATIO_ROUNDING = ROUND_HALF_EVEN
 
 
 class InvestmentScenarioInputError(ValueError):
@@ -40,6 +42,14 @@ def _require_positive(value: object, *, field: str) -> Decimal:
     if decimal_value <= ZERO:
         raise InvestmentScenarioInputError(f"{field} must be positive")
     return decimal_value
+
+
+def _divide_ratio(numerator: Decimal, denominator: Decimal) -> Decimal:
+    """Divide under the engine-owned reproducible ratio policy."""
+
+    context = Context(prec=RATIO_PRECISION, rounding=RATIO_ROUNDING)
+    with localcontext(context):
+        return numerator / denominator
 
 
 @dataclass(frozen=True)
@@ -106,15 +116,18 @@ class ScenarioOutcome:
 
 
 def calculate_investment_metrics(inputs: InvestmentMetricInputs) -> InvestmentMetrics:
-    """Calculate exact ROI/ROE/ROIC ratios from explicit Decimal inputs."""
+    """Calculate ROI/ROE/ROIC under the engine-owned Decimal ratio policy."""
 
     return InvestmentMetrics(
         initial_investment=inputs.initial_investment,
         equity=inputs.equity,
         invested_capital=inputs.invested_capital,
-        roi_ratio=inputs.net_return / inputs.initial_investment,
-        roe_ratio=inputs.net_income / inputs.equity,
-        roic_ratio=inputs.net_operating_profit_after_tax / inputs.invested_capital,
+        roi_ratio=_divide_ratio(inputs.net_return, inputs.initial_investment),
+        roe_ratio=_divide_ratio(inputs.net_income, inputs.equity),
+        roic_ratio=_divide_ratio(
+            inputs.net_operating_profit_after_tax,
+            inputs.invested_capital,
+        ),
     )
 
 
@@ -142,7 +155,7 @@ def calculate_scenarios(cases: Sequence[ScenarioCase]) -> tuple[ScenarioOutcome,
     for key in SCENARIO_KEYS:
         case = by_key[key]
         profit = case.revenue - case.costs
-        margin = None if case.revenue == ZERO else profit / case.revenue
+        margin = None if case.revenue == ZERO else _divide_ratio(profit, case.revenue)
         outcomes.append(
             ScenarioOutcome(
                 key=key,
@@ -193,6 +206,8 @@ def build_investment_scenario_snapshot(
             for item in scenarios
         ],
         "policy": {
+            "ratio_precision": RATIO_PRECISION,
+            "ratio_rounding": RATIO_ROUNDING,
             "tax_rate_inferred": False,
             "financing_mix_inferred": False,
             "inflation_inferred": False,
