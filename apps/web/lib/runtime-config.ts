@@ -4,6 +4,11 @@ function isLoopbackHostname(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 
+export function getPublicApiBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  return configured && configured.length > 0 ? configured : DEFAULT_DEVELOPMENT_API_BASE_URL;
+}
+
 export function getServerApiBaseUrl(): string {
   const configured = process.env.API_BASE_URL?.trim();
 
