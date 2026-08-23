@@ -164,10 +164,7 @@ def test_xlsx_export_is_deterministic_decimal_safe_and_formula_safe() -> None:
     assert cells
     assert all(cell.attrib.get("t") == "inlineStr" for cell in cells)
     assert root.find(".//x:f", namespace) is None
-    text_values = [
-        node.text or ""
-        for node in root.findall(".//x:t", namespace)
-    ]
+    text_values = [node.text or "" for node in root.findall(".//x:t", namespace)]
     assert "'=SUM(A1:A2)" in text_values
     assert "'@SUM(1,2)" in text_values
     assert "123.4500" in text_values
