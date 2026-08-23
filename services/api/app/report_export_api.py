@@ -14,7 +14,7 @@ from app.calculation_orchestration import (
 )
 from app.http_dependencies import get_authenticated_identity, get_database_session
 from app.models import Calculation, CalculationVersion
-from app.report_export import build_calculation_report_csv
+from app.report_export import build_calculation_report_csv, build_calculation_report_xlsx
 
 router = APIRouter(tags=["reports"])
 
@@ -67,6 +67,28 @@ def _authorized_calculation_version(
     return calculation, version
 
 
+def _validated_report_source(
+    session: Session,
+    *,
+    identity: AuthenticatedIdentity,
+    organization_id: UUID,
+    calculation_id: UUID,
+    version_number: int,
+) -> tuple[Calculation, CalculationVersion]:
+    if version_number < 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="version number must be positive",
+        )
+    return _authorized_calculation_version(
+        session,
+        identity=identity,
+        organization_id=organization_id,
+        calculation_id=calculation_id,
+        version_number=version_number,
+    )
+
+
 @router.get(
     "/{organization_id}/calculations/{calculation_id}/versions/{version_number}/report.csv",
     response_class=Response,
@@ -80,12 +102,7 @@ def export_calculation_report_csv(
 ) -> Response:
     """Download one immutable version as deterministic spreadsheet-safe CSV."""
 
-    if version_number < 1:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="version number must be positive",
-        )
-    calculation, version = _authorized_calculation_version(
+    calculation, version = _validated_report_source(
         session,
         identity=identity,
         organization_id=organization_id,
@@ -97,6 +114,39 @@ def export_calculation_report_csv(
     return Response(
         content=report.encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get(
+    "/{organization_id}/calculations/{calculation_id}/versions/{version_number}/report.xlsx",
+    response_class=Response,
+)
+def export_calculation_report_xlsx(
+    organization_id: UUID,
+    calculation_id: UUID,
+    version_number: int,
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    session: Annotated[Session, Depends(get_database_session)],
+) -> Response:
+    """Download one immutable version as a deterministic formula-safe XLSX."""
+
+    calculation, version = _validated_report_source(
+        session,
+        identity=identity,
+        organization_id=organization_id,
+        calculation_id=calculation_id,
+        version_number=version_number,
+    )
+    report = build_calculation_report_xlsx(calculation, version)
+    filename = f"calculation-{calculation.id}-v{version.version}.xlsx"
+    return Response(
+        content=report,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-store",
