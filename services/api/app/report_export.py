@@ -130,33 +130,45 @@ def build_calculation_report_xlsx(
     rows = _report_rows(calculation, version)
     files = {
         "[Content_Types].xml": (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
-            '<Default Extension="xml" ContentType="application/xml"/>'
-            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-            '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
-            '</Types>'
-        ).encode("utf-8"),
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/'
+            b'content-types">'
+            b'<Default Extension="rels" ContentType="application/vnd.'
+            b'openxmlformats-package.relationships+xml"/>'
+            b'<Default Extension="xml" ContentType="application/xml"/>'
+            b'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.'
+            b'openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            b'<Override PartName="/xl/worksheets/sheet1.xml" '
+            b'ContentType="application/vnd.openxmlformats-officedocument.'
+            b'spreadsheetml.worksheet+xml"/>'
+            b'</Types>'
+        ),
         "_rels/.rels": (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
-            '</Relationships>'
-        ).encode("utf-8"),
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            b'<Relationships xmlns="http://schemas.openxmlformats.org/package/'
+            b'2006/relationships">'
+            b'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/'
+            b'officeDocument/2006/relationships/officeDocument" '
+            b'Target="xl/workbook.xml"/>'
+            b'</Relationships>'
+        ),
         "xl/workbook.xml": (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
-            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            '<sheets><sheet name="Calculation" sheetId="1" r:id="rId1"/></sheets>'
-            '</workbook>'
-        ).encode("utf-8"),
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            b'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/'
+            b'2006/main" xmlns:r="http://schemas.openxmlformats.org/'
+            b'officeDocument/2006/relationships">'
+            b'<sheets><sheet name="Calculation" sheetId="1" r:id="rId1"/>'
+            b'</sheets></workbook>'
+        ),
         "xl/_rels/workbook.xml.rels": (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
-            '</Relationships>'
-        ).encode("utf-8"),
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            b'<Relationships xmlns="http://schemas.openxmlformats.org/package/'
+            b'2006/relationships">'
+            b'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/'
+            b'officeDocument/2006/relationships/worksheet" '
+            b'Target="worksheets/sheet1.xml"/>'
+            b'</Relationships>'
+        ),
         "xl/worksheets/sheet1.xml": _xlsx_sheet(rows),
     }
 
