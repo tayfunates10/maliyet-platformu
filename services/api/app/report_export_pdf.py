@@ -59,10 +59,7 @@ def _pdf_report_rows(
         ("provenance", "output_sha256", version.output_sha256),
         ("provenance", "created_at", version.created_at.isoformat()),
     )
-    rows.extend(
-        (section, key, _pdf_canonical_text(value))
-        for section, key, value in metadata
-    )
+    rows.extend((section, key, _pdf_canonical_text(value)) for section, key, value in metadata)
     rows.extend(
         ("output", key, _pdf_canonical_text(version.output_snapshot[key]))
         for key in sorted(version.output_snapshot)
@@ -139,12 +136,10 @@ def build_calculation_report_pdf(
             f"/Contents {content_id} 0 R >>"
         ).encode("ascii")
         objects[content_id] = (
-            f"<< /Length {len(content)} >>\nstream\n".encode("ascii")
-            + content
-            + b"endstream"
+            f"<< /Length {len(content)} >>\nstream\n".encode("ascii") + content + b"endstream"
         )
 
-    header = b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"
+    header = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"
     body = bytearray(header)
     offsets = [0]
     for object_id in range(1, max(objects) + 1):
@@ -158,8 +153,7 @@ def build_calculation_report_pdf(
         body.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
     body.extend(
         (
-            f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\n"
-            f"startxref\n{xref_offset}\n%%EOF\n"
+            f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n"
         ).encode("ascii")
     )
     return bytes(body)
