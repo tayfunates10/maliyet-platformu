@@ -12,7 +12,7 @@ from xml.sax.saxutils import escape
 from app.models import Calculation, CalculationVersion
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
-_XLSX_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+_OOXML_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 
 
 def _canonical_text(value: Any) -> str:
@@ -117,6 +117,12 @@ def _ooxml_escape_text(value: str) -> str:
     return "".join(encoded)
 
 
+def _ooxml_text(value: str) -> str:
+    escaped = escape(_ooxml_escape_text(value), {'"': "&quot;"})
+    preserve = ' xml:space="preserve"' if value != value.strip() else ""
+    return f"<w:t{preserve}>{escaped}</w:t>"
+
+
 def _xlsx_cell(column: str, row_number: int, value: str) -> str:
     """Render one inline-string XLSX cell with no formula execution surface."""
 
@@ -141,8 +147,8 @@ def _xlsx_sheet(rows: list[tuple[str, str, str]]) -> bytes:
     return document.encode("utf-8")
 
 
-def _write_xlsx_member(archive: zipfile.ZipFile, path: str, content: bytes) -> None:
-    info = zipfile.ZipInfo(path, _XLSX_ZIP_TIMESTAMP)
+def _write_ooxml_member(archive: zipfile.ZipFile, path: str, content: bytes) -> None:
+    info = zipfile.ZipInfo(path, _OOXML_ZIP_TIMESTAMP)
     info.compress_type = zipfile.ZIP_DEFLATED
     info.external_attr = 0o600 << 16
     archive.writestr(info, content)
@@ -152,12 +158,7 @@ def build_calculation_report_xlsx(
     calculation: Calculation,
     version: CalculationVersion,
 ) -> bytes:
-    """Build a deterministic XLSX report without recalculation or float coercion.
-
-    Every worksheet value is emitted as an OOXML inline string. Decimal strings
-    therefore retain their exact representation and formula-looking inputs can
-    never become executable spreadsheet formulas.
-    """
+    """Build a deterministic XLSX report without recalculation or float coercion."""
 
     rows = _report_rows(calculation, version)
     files = {
@@ -207,5 +208,58 @@ def build_calculation_report_xlsx(
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, mode="w") as archive:
         for path in sorted(files):
-            _write_xlsx_member(archive, path, files[path])
+            _write_ooxml_member(archive, path, files[path])
+    return buffer.getvalue()
+
+
+def _docx_document(rows: list[tuple[str, str, str]]) -> bytes:
+    row_xml = []
+    for row in rows:
+        cells = "".join(
+            f"<w:tc><w:p><w:r>{_ooxml_text(value)}</w:r></w:p></w:tc>" for value in row
+        )
+        row_xml.append(f"<w:tr>{cells}</w:tr>")
+    document = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:body><w:tbl>" + "".join(row_xml) + "</w:tbl></w:body></w:document>"
+    )
+    return document.encode("utf-8")
+
+
+def build_calculation_report_docx(
+    calculation: Calculation,
+    version: CalculationVersion,
+) -> bytes:
+    """Build a deterministic DOCX report from an immutable calculation version."""
+
+    rows = _report_rows(calculation, version)
+    files = {
+        "[Content_Types].xml": (
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/'
+            b'content-types">'
+            b'<Default Extension="rels" ContentType="application/vnd.'
+            b'openxmlformats-package.relationships+xml"/>'
+            b'<Default Extension="xml" ContentType="application/xml"/>'
+            b'<Override PartName="/word/document.xml" ContentType="application/vnd.'
+            b'openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            b"</Types>"
+        ),
+        "_rels/.rels": (
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            b'<Relationships xmlns="http://schemas.openxmlformats.org/package/'
+            b'2006/relationships">'
+            b'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/'
+            b'officeDocument/2006/relationships/officeDocument" '
+            b'Target="word/document.xml"/>'
+            b"</Relationships>"
+        ),
+        "word/document.xml": _docx_document(rows),
+    }
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w") as archive:
+        for path in sorted(files):
+            _write_ooxml_member(archive, path, files[path])
     return buffer.getvalue()
