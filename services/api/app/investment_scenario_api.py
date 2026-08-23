@@ -19,7 +19,7 @@ from app.investment_scenario_engine import (
     calculate_scenarios,
 )
 
-router = APIRouter(prefix="/organizations/{organization_id}/decision-analysis", tags=["decision-analysis"])
+router = APIRouter(prefix="/{organization_id}/decision-analysis", tags=["decision-analysis"])
 
 
 class ScenarioRequest(BaseModel):
