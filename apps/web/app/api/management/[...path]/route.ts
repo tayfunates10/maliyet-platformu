@@ -3,13 +3,17 @@ import { getPublicApiBaseUrl } from "@/lib/runtime-config";
 
 const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}";
 const ENGINE_KEY = "[a-z][a-z0-9_]{0,79}";
+const VERSION = "[1-9][0-9]*";
+const REPORT_FORMAT = "(?:csv|xlsx|docx|pdf)";
 const MAX_BODY_BYTES = 16_384;
+const MAX_REPORT_BYTES = 8 * 1024 * 1024;
 const DEPLOYMENT_PAGE_LIMIT = 100;
 
 type RouteRule = Readonly<{
   method: "GET" | "POST" | "PUT";
   pattern: RegExp;
   authenticated: boolean;
+  responseKind?: "json" | "report";
   allowDeploymentPagination?: boolean;
   allowEmptyBody?: boolean;
 }>;
@@ -36,6 +40,14 @@ const ROUTE_RULES: readonly RouteRule[] = Object.freeze([
     pattern: new RegExp(`^organizations/${UUID}/calculations/${UUID}/versions$`),
     authenticated: true,
     allowDeploymentPagination: true,
+  },
+  {
+    method: "GET",
+    pattern: new RegExp(
+      `^organizations/${UUID}/calculations/${UUID}/versions/${VERSION}/report\\.${REPORT_FORMAT}$`,
+    ),
+    authenticated: true,
+    responseKind: "report",
   },
   {
     method: "POST",
@@ -84,6 +96,13 @@ const ROUTE_RULES: readonly RouteRule[] = Object.freeze([
     pattern: new RegExp(`^organizations/${UUID}/widget-deployments/${UUID}/presentation$`),
     authenticated: true,
   },
+]);
+
+const REPORT_CONTENT_TYPES = Object.freeze([
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/pdf",
 ]);
 
 function upstreamApiBase(): string {
@@ -146,6 +165,28 @@ function genericJson(status: number, detail: string): NextResponse {
   );
 }
 
+function safeContentDisposition(value: string | null): string | null {
+  if (value === null || value.length > 240 || /[\r\n]/.test(value)) return null;
+  return /^attachment; filename="[A-Za-z0-9._-]+"$/.test(value) ? value : null;
+}
+
+async function proxyReport(upstream: Response): Promise<NextResponse> {
+  const contentType = upstream.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  if (!REPORT_CONTENT_TYPES.includes(contentType)) {
+    return genericJson(502, "management upstream returned invalid report content");
+  }
+  const body = await upstream.arrayBuffer();
+  if (body.byteLength > MAX_REPORT_BYTES) return genericJson(502, "management upstream report too large");
+  const headers = new Headers({
+    "Content-Type": upstream.headers.get("content-type") ?? contentType,
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  });
+  const disposition = safeContentDisposition(upstream.headers.get("content-disposition"));
+  if (disposition !== null) headers.set("Content-Disposition", disposition);
+  return new NextResponse(body, { status: upstream.status, headers });
+}
+
 async function proxy(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { path: pathParts } = await context.params;
   const path = pathParts.join("/");
@@ -178,9 +219,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
       body = undefined;
     } else {
       const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
-      if (contentType !== "application/json") {
-        return genericJson(415, "application/json required");
-      }
+      if (contentType !== "application/json") return genericJson(415, "application/json required");
       body = candidateBody;
     }
   }
@@ -192,7 +231,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     return genericJson(503, "management upstream unavailable");
   }
 
-  const headers = new Headers({ Accept: "application/json" });
+  const headers = new Headers({ Accept: rule.responseKind === "report" ? "*/*" : "application/json" });
   if (authorization !== null && rule.authenticated) headers.set("Authorization", authorization);
   if (body !== undefined) headers.set("Content-Type", "application/json");
 
@@ -209,13 +248,11 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     return genericJson(502, "management upstream request failed");
   }
 
+  if (rule.responseKind === "report" && upstream.ok) return proxyReport(upstream);
   if (upstream.status === 204) {
     return new NextResponse(null, {
       status: 204,
-      headers: {
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
+      headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
     });
   }
 
@@ -237,9 +274,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
   });
 }
 
-type RouteContext = Readonly<{
-  params: Promise<{ path: string[] }>;
-}>;
+type RouteContext = Readonly<{ params: Promise<{ path: string[] }> }>;
 
 export function GET(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   return proxy(request, context);
