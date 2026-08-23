@@ -80,10 +80,47 @@ def build_calculation_report_csv(
     return buffer.getvalue()
 
 
+def _is_xml_10_character(codepoint: int) -> bool:
+    return (
+        codepoint in {0x09, 0x0A, 0x0D}
+        or 0x20 <= codepoint <= 0xD7FF
+        or 0xE000 <= codepoint <= 0xFFFD
+        or 0x10000 <= codepoint <= 0x10FFFF
+    )
+
+
+def _ooxml_escape_text(value: str) -> str:
+    """Encode XML-forbidden characters using OOXML escaped-string syntax."""
+
+    encoded: list[str] = []
+    index = 0
+    while index < len(value):
+        candidate = value[index : index + 7]
+        if (
+            len(candidate) == 7
+            and candidate[0:2].lower() == "_x"
+            and candidate[6] == "_"
+            and all(character in "0123456789abcdefABCDEF" for character in candidate[2:6])
+        ):
+            encoded.append("_x005F_")
+            encoded.append(candidate[1:])
+            index += 7
+            continue
+
+        character = value[index]
+        codepoint = ord(character)
+        if _is_xml_10_character(codepoint):
+            encoded.append(character)
+        else:
+            encoded.append(f"_x{codepoint:04X}_")
+        index += 1
+    return "".join(encoded)
+
+
 def _xlsx_cell(column: str, row_number: int, value: str) -> str:
     """Render one inline-string XLSX cell with no formula execution surface."""
 
-    escaped = escape(value, {'"': "&quot;"})
+    escaped = escape(_ooxml_escape_text(value), {'"': "&quot;"})
     preserve = ' xml:space="preserve"' if value != value.strip() else ""
     return (
         f'<c r="{column}{row_number}" t="inlineStr">'
