@@ -73,6 +73,27 @@ if (!nextConfig.includes("useTypeScriptCli: true")) {
   throw new Error("Next.js must use the TypeScript CLI for TypeScript 7 compatibility");
 }
 
+const requiredApplicationHeaders = [
+  '{ key: "X-Content-Type-Options", value: "nosniff" }',
+  '{ key: "Referrer-Policy", value: "no-referrer" }',
+  '{ key: "X-Frame-Options", value: "DENY" }',
+  'value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()"',
+  '{ key: "Cross-Origin-Opener-Policy", value: "same-origin" }',
+  '{ key: "Cross-Origin-Resource-Policy", value: "same-origin" }',
+  '{ key: "X-Permitted-Cross-Domain-Policies", value: "none" }',
+];
+for (const headerContract of requiredApplicationHeaders) {
+  if (!nextConfig.includes(headerContract)) {
+    throw new Error(`Missing application security header contract: ${headerContract}`);
+  }
+}
+if (!nextConfig.includes('source: "/((?!widget/).*)"')) {
+  throw new Error("Application security headers must exclude immutable cross-origin widget assets");
+}
+if (!nextConfig.includes('{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" }')) {
+  throw new Error("Published widget assets must retain their reviewed cross-origin resource policy");
+}
+
 const widgetV100 = readFileSync(resolve(root, "public/widget/v1.0.0/loader.js"), "utf8");
 if (!widgetV100.includes('const SDK_VERSION = "1.0.0"')) {
   throw new Error("Widget v1.0.0 asset must self-identify as version 1.0.0");
