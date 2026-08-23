@@ -8,6 +8,7 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from app.auth_context import AuthSession
+from app.decision_analysis_models import DecisionAnalysisArtifact
 from app.models import Base
 from app.password_auth import UserCredential
 from app.rules_models import RuleDefinition, RuleSource, RuleVersion
@@ -28,6 +29,7 @@ REGISTERED_AUXILIARY_MODELS = (
     RuleVersion,
     AuthSession,
     UserCredential,
+    DecisionAnalysisArtifact,
     WidgetBrandingProfile,
     WidgetPresentationSnapshot,
     WidgetPublishedPresentation,
