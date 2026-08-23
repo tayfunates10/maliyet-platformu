@@ -5,7 +5,17 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKeyConstraint, Index, String, UniqueConstraint, Uuid, func
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    DateTime,
+    ForeignKeyConstraint,
+    Index,
+    String,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models import Base
