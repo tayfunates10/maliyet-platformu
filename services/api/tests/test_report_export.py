@@ -185,11 +185,15 @@ def test_report_export_rejects_tampered_version(app_db_session: Session) -> None
         app_db_session,
         suffix="tampered",
     )
-    version = app_db_session.query(CalculationVersion).filter_by(
-        organization_id=organization.id,
-        calculation_id=calculation.id,
-        version=1,
-    ).one()
+    version = (
+        app_db_session.query(CalculationVersion)
+        .filter_by(
+            organization_id=organization.id,
+            calculation_id=calculation.id,
+            version=1,
+        )
+        .one()
+    )
     version.output_snapshot = {**version.output_snapshot, "contribution_profit": "999999.00"}
     app_db_session.flush()
 
