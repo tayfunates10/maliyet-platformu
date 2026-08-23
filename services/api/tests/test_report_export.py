@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.auth_context import issue_session
 from app.main import app
-from app.models import Calculation, Organization, OrganizationMembership, User
+from app.models import Calculation, CalculationVersion, Organization, OrganizationMembership, User
 from app.report_export import build_calculation_report_csv
 
 
@@ -75,6 +75,29 @@ def _trade_payload() -> dict[str, object]:
             }
         ]
     }
+
+
+def _execute_trade(
+    session: Session,
+    *,
+    suffix: str,
+) -> tuple[Organization, Calculation, str]:
+    owner, organization, owner_token = _tenant(session, suffix=suffix)
+    calculation = Calculation(
+        organization_id=organization.id,
+        created_by_user_id=owner.id,
+        name="Trade report",
+        calculation_type="trade",
+    )
+    session.add(calculation)
+    session.flush()
+    response = TestClient(app).post(
+        f"/organizations/{organization.id}/calculations/{calculation.id}/execute/trade",
+        json=_trade_payload(),
+        headers=_headers(owner_token),
+    )
+    assert response.status_code == 201
+    return organization, calculation, owner_token
 
 
 def test_csv_export_is_deterministic_decimal_safe_and_formula_safe() -> None:
@@ -155,6 +178,28 @@ def test_authorized_member_can_download_immutable_version_csv(app_db_session: Se
     assert '"provenance","output_sha256"' in text
     assert '"calculation","name","Trade report"' in text
     assert '"output","contribution_profit"' in text
+
+
+def test_report_export_rejects_tampered_version(app_db_session: Session) -> None:
+    organization, calculation, owner_token = _execute_trade(
+        app_db_session,
+        suffix="tampered",
+    )
+    version = app_db_session.query(CalculationVersion).filter_by(
+        organization_id=organization.id,
+        calculation_id=calculation.id,
+        version=1,
+    ).one()
+    version.output_snapshot = {**version.output_snapshot, "contribution_profit": "999999.00"}
+    app_db_session.flush()
+
+    response = TestClient(app).get(
+        f"/organizations/{organization.id}/calculations/{calculation.id}/versions/1/report.csv",
+        headers=_headers(owner_token),
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "calculation version integrity verification failed"}
 
 
 def test_cross_tenant_report_export_fails_closed(app_db_session: Session) -> None:
