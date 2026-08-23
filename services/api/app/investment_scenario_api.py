@@ -280,7 +280,10 @@ def get_investment_scenario_analysis(
             artifact_id=artifact_id,
         )
     except TenantResourceNotFound as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="analysis not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="analysis not found",
+        ) from exc
     except DecisionAnalysisIntegrityError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
