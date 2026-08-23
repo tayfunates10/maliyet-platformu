@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -33,6 +34,7 @@ class DecisionAnalysisReplay:
     output_snapshot: dict[str, object]
     input_sha256: str
     output_sha256: str
+    created_at: datetime
 
 
 def record_decision_analysis(
@@ -144,4 +146,5 @@ def load_decision_analysis(
         output_snapshot=output_copy,
         input_sha256=artifact.input_sha256,
         output_sha256=artifact.output_sha256,
+        created_at=artifact.created_at,
     )
