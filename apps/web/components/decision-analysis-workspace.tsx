@@ -36,11 +36,8 @@ function friendlyError(error: unknown): string {
   return "Karar analizi tamamlanamadı. Girdileri kontrol edip tekrar deneyin.";
 }
 
-function percent(ratio: string | null): string {
-  if (ratio === null) return "—";
-  const numeric = Number(ratio);
-  if (!Number.isFinite(numeric)) return ratio;
-  return new Intl.NumberFormat("tr-TR", { style: "percent", maximumFractionDigits: 4 }).format(numeric);
+function exactRatio(ratio: string | null): string {
+  return ratio ?? "—";
 }
 
 export function DecisionAnalysisWorkspace() {
@@ -207,14 +204,15 @@ export function DecisionAnalysisWorkspace() {
         <div className={styles.panel} aria-live="polite">
           <h3>Sonuç</h3>
           <p>Motor: {result.engine_version}</p>
+          <p>Oranlar backend tarafından üretilen exact Decimal metinleridir; tarayıcıda yeniden hesaplanmaz.</p>
           <ul className={styles.list}>
-            <li><strong>ROI</strong><span>{percent(result.roi_ratio)}</span></li>
-            <li><strong>ROE</strong><span>{percent(result.roe_ratio)}</span></li>
-            <li><strong>ROIC</strong><span>{percent(result.roic_ratio)}</span></li>
+            <li><strong>ROI oranı</strong><span>{exactRatio(result.roi_ratio)}</span></li>
+            <li><strong>ROE oranı</strong><span>{exactRatio(result.roe_ratio)}</span></li>
+            <li><strong>ROIC oranı</strong><span>{exactRatio(result.roic_ratio)}</span></li>
             {result.scenarios.map((scenario) => (
               <li key={scenario.key}>
                 <div><strong>{scenario.key}</strong><span>Kâr: {scenario.profit}</span></div>
-                <span>Marj: {percent(scenario.profit_margin_ratio)}</span>
+                <span>Marj oranı: {exactRatio(scenario.profit_margin_ratio)}</span>
               </li>
             ))}
           </ul>
