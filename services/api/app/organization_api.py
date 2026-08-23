@@ -22,6 +22,7 @@ from app.organization_onboarding import (
 )
 from app.public_projection_api import public_router as public_projection_public_router
 from app.public_projection_api import tenant_router as public_projection_tenant_router
+from app.report_export_api import router as report_export_router
 from app.tax_profile_api import router as tax_profile_router
 from app.widget_api import public_router as widget_public_router
 from app.widget_api import tenant_router as widget_tenant_router
@@ -38,6 +39,7 @@ router.include_router(widget_public_router)
 router.include_router(widget_branding_profile_router)
 router.include_router(widget_branding_deployment_router)
 router.include_router(widget_deployment_discovery_router)
+router.include_router(report_export_router)
 
 
 class OrganizationCreateRequest(BaseModel):
