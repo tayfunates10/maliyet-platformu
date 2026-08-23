@@ -21,6 +21,9 @@ from app.investment_scenario_engine import (
 
 router = APIRouter(prefix="/{organization_id}/decision-analysis", tags=["decision-analysis"])
 
+MAX_DECIMAL_ADJUSTED_EXPONENT = 120
+MAX_DECIMAL_DIGITS = 120
+
 
 class ScenarioRequest(BaseModel):
     """One explicit scenario; values stay strings across the JSON boundary."""
@@ -67,6 +70,17 @@ def _decimal(value: str, *, field: str) -> Decimal:
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"{field} must be finite",
         )
+    decimal_tuple = result.as_tuple()
+    if len(decimal_tuple.digits) > MAX_DECIMAL_DIGITS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"{field} exceeds supported decimal precision",
+        )
+    if result != 0 and abs(result.adjusted()) > MAX_DECIMAL_ADJUSTED_EXPONENT:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"{field} exceeds supported decimal exponent range",
+        )
     return result
 
 
@@ -103,30 +117,46 @@ def calculate_investment_scenario_analysis(
         organization_id=organization_id,
     )
     try:
-        metrics = calculate_investment_metrics(
-            InvestmentMetricInputs(
-                initial_investment=_decimal(payload.initial_investment, field="initial_investment"),
-                net_return=_decimal(payload.net_return, field="net_return"),
-                equity=_decimal(payload.equity, field="equity"),
-                net_income=_decimal(payload.net_income, field="net_income"),
-                invested_capital=_decimal(payload.invested_capital, field="invested_capital"),
-                net_operating_profit_after_tax=_decimal(
-                    payload.net_operating_profit_after_tax,
-                    field="net_operating_profit_after_tax",
-                ),
+        metric_inputs = InvestmentMetricInputs(
+            initial_investment=_decimal(payload.initial_investment, field="initial_investment"),
+            net_return=_decimal(payload.net_return, field="net_return"),
+            equity=_decimal(payload.equity, field="equity"),
+            net_income=_decimal(payload.net_income, field="net_income"),
+            invested_capital=_decimal(payload.invested_capital, field="invested_capital"),
+            net_operating_profit_after_tax=_decimal(
+                payload.net_operating_profit_after_tax,
+                field="net_operating_profit_after_tax",
+            ),
+        )
+        scenario_inputs = [
+            ScenarioCase(
+                key=item.key,
+                revenue=_decimal(item.revenue, field=f"scenario[{item.key}].revenue"),
+                costs=_decimal(item.costs, field=f"scenario[{item.key}].costs"),
             )
-        )
-        scenarios = calculate_scenarios(
-            [
-                ScenarioCase(
-                    key=item.key,
-                    revenue=_decimal(item.revenue, field=f"scenario[{item.key}].revenue"),
-                    costs=_decimal(item.costs, field=f"scenario[{item.key}].costs"),
-                )
-                for item in payload.scenarios
-            ]
-        )
+            for item in payload.scenarios
+        ]
+        metrics = calculate_investment_metrics(metric_inputs)
+        scenarios = calculate_scenarios(scenario_inputs)
         snapshot = build_investment_scenario_snapshot(metrics=metrics, scenarios=scenarios)
+        snapshot["inputs"] = {
+            "initial_investment": str(metric_inputs.initial_investment),
+            "net_return": str(metric_inputs.net_return),
+            "equity": str(metric_inputs.equity),
+            "net_income": str(metric_inputs.net_income),
+            "invested_capital": str(metric_inputs.invested_capital),
+            "net_operating_profit_after_tax": str(
+                metric_inputs.net_operating_profit_after_tax
+            ),
+            "scenarios": [
+                {
+                    "key": item.key,
+                    "revenue": str(item.revenue),
+                    "costs": str(item.costs),
+                }
+                for item in scenario_inputs
+            ],
+        }
     except InvestmentScenarioInputError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
