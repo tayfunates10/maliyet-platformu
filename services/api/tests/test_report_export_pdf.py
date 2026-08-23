@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.auth_context import issue_session
 from app.main import app
 from app.models import Calculation, Organization, OrganizationMembership, User
-from app.report_export import build_calculation_report_pdf
+from app.report_export_pdf import build_calculation_report_pdf
 
 
 def _simple_report_source() -> tuple[SimpleNamespace, SimpleNamespace]:
@@ -31,9 +32,20 @@ def _simple_report_source() -> tuple[SimpleNamespace, SimpleNamespace]:
         ruleset_sha256="b" * 64,
         output_sha256="c" * 64,
         created_at=datetime(2026, 8, 23, tzinfo=UTC),
-        output_snapshot={"decimal": "123.4500", "unicode": "şğİı"},
+        output_snapshot={
+            "decimal": "123.4500",
+            "loss": "-120.00",
+            "unicode": "şğİı",
+        },
     )
     return calculation, version
+
+
+def _text_operands(pdf: bytes) -> list[str]:
+    return [
+        bytes.fromhex(match.decode("ascii")).decode("ascii")
+        for match in re.findall(rb"<([0-9A-F]+)> Tj", pdf)
+    ]
 
 
 def test_pdf_export_is_deterministic_and_preserves_canonical_text() -> None:
@@ -48,11 +60,22 @@ def test_pdf_export_is_deterministic_and_preserves_canonical_text() -> None:
     assert b"xref\n" in first
     assert b"/BaseFont /Helvetica" in first
 
-    decimal_hex = "123.4500".encode("ascii").hex().upper().encode("ascii")
-    unicode_ascii = "\\u015f\\u011f\\u0130\\u0131".encode("ascii")
-    unicode_hex = unicode_ascii.hex().upper().encode("ascii")
-    assert decimal_hex in first
-    assert unicode_hex in first
+    text = "\n".join(_text_operands(first))
+    assert "123.4500" in text
+    assert "-120.00" in text
+    assert "'-120.00" not in text
+    assert "\\u015f\\u011f\\u0130\\u0131" in text
+
+
+def test_pdf_lines_fit_conservative_helvetica_width_bound() -> None:
+    calculation, version = _simple_report_source()
+    calculation.name = "W" * 240
+
+    report = build_calculation_report_pdf(calculation, version)
+    operands = _text_operands(report)
+
+    assert operands
+    assert max(map(len, operands)) <= 65
 
 
 def _tenant(
