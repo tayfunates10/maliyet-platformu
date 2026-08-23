@@ -17,9 +17,9 @@ from app.models import Calculation, CalculationVersion
 from app.report_export import (
     build_calculation_report_csv,
     build_calculation_report_docx,
-    build_calculation_report_pdf,
     build_calculation_report_xlsx,
 )
+from app.report_export_pdf import build_calculation_report_pdf
 
 router = APIRouter(tags=["reports"])
 
