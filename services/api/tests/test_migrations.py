@@ -5,7 +5,13 @@ from conftest import alembic_config, database_url
 from sqlalchemy import create_engine, inspect
 
 from alembic import command
-from app import auth_context, password_auth, rules_models, widget_branding_models
+from app import (
+    auth_context,
+    decision_analysis_models,
+    password_auth,
+    rules_models,
+    widget_branding_models,
+)
 from app.models import Base
 
 ALEMBIC_VERSION_NUM_MAX_LENGTH = 32
@@ -21,6 +27,7 @@ def expected_tables() -> set[str]:
     assert auth_context.AuthSession.__tablename__ in Base.metadata.tables
     assert password_auth.UserCredential.__tablename__ in Base.metadata.tables
     assert rules_models.RuleSource.__tablename__ in Base.metadata.tables
+    assert decision_analysis_models.DecisionAnalysisArtifact.__tablename__ in Base.metadata.tables
     assert widget_branding_models.WidgetBrandingProfile.__tablename__ in Base.metadata.tables
     assert widget_branding_models.WidgetPresentationSnapshot.__tablename__ in Base.metadata.tables
     assert widget_branding_models.WidgetPublishedPresentation.__tablename__ in Base.metadata.tables
