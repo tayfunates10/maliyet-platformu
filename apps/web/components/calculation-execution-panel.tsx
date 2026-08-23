@@ -23,8 +23,23 @@ type Props = Readonly<{
 }>;
 
 type Notice = Readonly<{ kind: "error" | "success" | "info"; text: string }> | null;
-
 type JsonObject = Readonly<Record<string, unknown>>;
+type ReportFormat = "csv" | "xlsx" | "docx" | "pdf";
+
+const REPORT_FORMATS: readonly Readonly<{ format: ReportFormat; label: string; contentType: string }>[] = Object.freeze([
+  { format: "csv", label: "CSV", contentType: "text/csv" },
+  {
+    format: "xlsx",
+    label: "Excel",
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  },
+  {
+    format: "docx",
+    label: "Word",
+    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  },
+  { format: "pdf", label: "PDF", contentType: "application/pdf" },
+]);
 
 function friendlyError(error: unknown): string {
   if (error instanceof Error) {
@@ -32,13 +47,21 @@ function friendlyError(error: unknown): string {
     if (error.message === "access_denied") return "Bu işlem için yetkiniz yok.";
     if (error.message === "invalid_request") return "Motor girdisi doğrulamadan geçmedi.";
     if (error.message === "request_too_large") return "Motor girdisi izin verilen boyutu aşıyor.";
-    if (error.message === "conflict") return "Motor, seçili hesaplama türüyle eşleşmiyor veya işlem çakıştı.";
+    if (error.message === "conflict") return "Kayıt bütünlüğü doğrulanamadı veya işlem mevcut durumla çakıştı.";
+    if (error.message === "report_invalid") return "Rapor yanıtı güvenlik doğrulamasından geçmedi.";
   }
   return "İşlem tamamlanamadı.";
 }
 
 function pretty(value: unknown): string {
   return JSON.stringify(value, null, 2);
+}
+
+function reportFilename(response: Response, fallback: string): string {
+  const disposition = response.headers.get("content-disposition");
+  if (disposition === null) return fallback;
+  const match = /^attachment; filename="([A-Za-z0-9._-]+)"$/.exec(disposition);
+  return match?.[1] ?? fallback;
 }
 
 export function CalculationExecutionPanel({ token, organizationId, calculation, engine, canWrite }: Props) {
@@ -50,6 +73,7 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
   const [schemaLoaded, setSchemaLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const reportVersion = execution?.version ?? latestVersion?.version ?? null;
 
   async function loadSchema() {
     setBusy(true);
@@ -79,7 +103,53 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
     try {
       const version = await getLatestCalculationVersion(token, organizationId, calculation.id);
       setLatestVersion(version);
+      setExecution(null);
       setNotice({ kind: "info", text: version === null ? "Bu hesaplama için henüz kayıtlı sürüm yok." : `Kayıtlı sürüm #${version.version} yüklendi.` });
+    } catch (error) {
+      setNotice({ kind: "error", text: friendlyError(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function downloadReport(format: ReportFormat) {
+    if (reportVersion === null) return;
+    const definition = REPORT_FORMATS.find((item) => item.format === format);
+    if (definition === undefined) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const response = await fetch(
+        `/api/management/organizations/${organizationId}/calculations/${calculation.id}/versions/${reportVersion}/report.${format}`,
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+          credentials: "same-origin",
+          redirect: "error",
+          referrerPolicy: "no-referrer",
+        },
+      );
+      if (!response.ok) {
+        if (response.status === 401) throw new Error("authentication_required");
+        if (response.status === 403) throw new Error("access_denied");
+        if (response.status === 409) throw new Error("conflict");
+        throw new Error("report_invalid");
+      }
+      const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+      if (contentType !== definition.contentType) throw new Error("report_invalid");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      try {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = reportFilename(response, `calculation-${calculation.id}-v${reportVersion}.${format}`);
+        anchor.rel = "noopener";
+        anchor.click();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      setNotice({ kind: "success", text: `Sürüm #${reportVersion} ${definition.label} raporu indirildi.` });
     } catch (error) {
       setNotice({ kind: "error", text: friendlyError(error) });
     } finally {
@@ -93,13 +163,7 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
     setBusy(true);
     setNotice(null);
     try {
-      const result = await executeCalculation(
-        token,
-        organizationId,
-        calculation.id,
-        engine.key,
-        inputValue,
-      );
+      const result = await executeCalculation(token, organizationId, calculation.id, engine.key, inputValue);
       setExecution(result);
       setLatestVersion(null);
       setNotice({ kind: "success", text: `Hesaplama tamamlandı ve immutable sürüm #${result.version} kaydedildi.` });
@@ -130,24 +194,38 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
       ) : (
         <form className={styles.form} onSubmit={handleExecute}>
           {requiredFields.length > 0 ? <p className={styles.kicker}>Zorunlu üst alanlar: {requiredFields.join(", ")}</p> : null}
-          <SchemaFieldEditor
-            schema={inputSchema}
-            value={inputValue}
-            disabled={!canWrite || busy}
-            onChange={setInputValue}
-          />
+          <SchemaFieldEditor schema={inputSchema} value={inputValue} disabled={!canWrite || busy} onChange={setInputValue} />
           <details className={styles.jsonPreview}>
             <summary>Gönderilecek JSON önizlemesi</summary>
             <pre>{pretty(inputValue)}</pre>
           </details>
-          <button type="submit" disabled={!canWrite || busy}>
-            {busy ? "Çalıştırılıyor…" : "Hesapla ve sürüm kaydet"}
-          </button>
+          <button type="submit" disabled={!canWrite || busy}>{busy ? "Çalıştırılıyor…" : "Hesapla ve sürüm kaydet"}</button>
         </form>
       )}
 
       {!canWrite ? <p role="status">Bu rol salt-okunur; yeni execution oluşturamaz.</p> : null}
       {notice !== null ? <p className={styles.notice} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</p> : null}
+
+      {reportVersion !== null ? (
+        <div className={styles.result}>
+          <h4>Sürüm #{reportVersion} raporları</h4>
+          <p>Raporlar immutable kayıt üzerinden üretilir; tarayıcı hesaplama sonucunu yeniden hesaplamaz.</p>
+          <fieldset className={styles.listActions}>
+            <legend>Sürüm {reportVersion} rapor indirmeleri</legend>
+            {REPORT_FORMATS.map((item) => (
+              <button
+                key={item.format}
+                type="button"
+                className={styles.secondary}
+                onClick={() => void downloadReport(item.format)}
+                disabled={busy}
+              >
+                {item.label} indir
+              </button>
+            ))}
+          </fieldset>
+        </div>
+      ) : null}
 
       {execution !== null ? (
         <div className={styles.result}>
