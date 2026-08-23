@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 
 const originalNodeEnv = process.env.NODE_ENV;
-const originalApiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+const originalApiBase = process.env.API_BASE_URL;
+const originalPublicApiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
 let importCounter = 0;
 
 async function loadRuntimeConfig() {
@@ -16,19 +17,21 @@ async function resolveApiBase({ nodeEnv, apiBase }) {
     process.env.NODE_ENV = nodeEnv;
   }
   if (apiBase === undefined) {
-    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+    delete process.env.API_BASE_URL;
   } else {
-    process.env.NEXT_PUBLIC_API_BASE_URL = apiBase;
+    process.env.API_BASE_URL = apiBase;
   }
 
-  const { getPublicApiBaseUrl } = await loadRuntimeConfig();
-  return getPublicApiBaseUrl();
+  const { getServerApiBaseUrl } = await loadRuntimeConfig();
+  return getServerApiBaseUrl();
 }
 
 try {
+  process.env.NEXT_PUBLIC_API_BASE_URL = "https://build-placeholder.example.invalid";
+
   await assert.rejects(
     () => resolveApiBase({ nodeEnv: "production", apiBase: undefined }),
-    /NEXT_PUBLIC_API_BASE_URL is required in production/,
+    /API_BASE_URL is required in production/,
   );
   await assert.rejects(
     () => resolveApiBase({ nodeEnv: "production", apiBase: "http://api.example.com" }),
@@ -61,6 +64,13 @@ try {
     /must use HTTPS/,
   );
 
+  process.env.NODE_ENV = "production";
+  process.env.API_BASE_URL = "https://runtime-a.example.com";
+  const { getServerApiBaseUrl } = await loadRuntimeConfig();
+  assert.equal(getServerApiBaseUrl(), "https://runtime-a.example.com");
+  process.env.API_BASE_URL = "https://runtime-b.example.com";
+  assert.equal(getServerApiBaseUrl(), "https://runtime-b.example.com");
+
   console.log("Runtime config contract: PASS");
 } finally {
   if (originalNodeEnv === undefined) {
@@ -69,8 +79,13 @@ try {
     process.env.NODE_ENV = originalNodeEnv;
   }
   if (originalApiBase === undefined) {
+    delete process.env.API_BASE_URL;
+  } else {
+    process.env.API_BASE_URL = originalApiBase;
+  }
+  if (originalPublicApiBase === undefined) {
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
   } else {
-    process.env.NEXT_PUBLIC_API_BASE_URL = originalApiBase;
+    process.env.NEXT_PUBLIC_API_BASE_URL = originalPublicApiBase;
   }
 }
