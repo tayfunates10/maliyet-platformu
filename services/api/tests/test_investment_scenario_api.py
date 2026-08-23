@@ -156,7 +156,11 @@ def test_large_scenario_values_do_not_use_ambient_decimal_precision(
 
     assert response.status_code == 200
     profits = [item["profit"] for item in response.json()["snapshot"]["scenarios"]]
-    assert profits[0] == "999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999"
+    expected_profit = (
+        "999999999999999999999999999999999999999999999999999999999999"
+        "999999999999999999999999999999999999999999999999999999999999"
+    )
+    assert profits[0] == expected_profit
 
 
 def test_mislabeled_scenario_profit_order_fails_closed(app_db_session: Session) -> None:
