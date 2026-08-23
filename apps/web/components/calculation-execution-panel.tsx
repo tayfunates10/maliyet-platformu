@@ -210,7 +210,7 @@ export function CalculationExecutionPanel({ token, organizationId, calculation, 
         <div className={styles.result}>
           <h4>Sürüm #{reportVersion} raporları</h4>
           <p>Raporlar immutable kayıt üzerinden üretilir; tarayıcı hesaplama sonucunu yeniden hesaplamaz.</p>
-          <div className={styles.listActions} aria-label={`Sürüm ${reportVersion} rapor indirmeleri`}>
+          <div className={styles.listActions} role="group" aria-label={`Sürüm ${reportVersion} rapor indirmeleri`}>
             {REPORT_FORMATS.map((item) => (
               <button
                 key={item.format}
