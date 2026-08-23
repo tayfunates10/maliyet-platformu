@@ -220,6 +220,8 @@ async function proxyReport(upstream: Response): Promise<NextResponse> {
   }
   const body = await readBoundedReportBody(upstream);
   if (body === null) return genericJson(502, "management upstream report too large");
+  const responseBody = new ArrayBuffer(body.byteLength);
+  new Uint8Array(responseBody).set(body);
   const headers = new Headers({
     "Content-Type": upstream.headers.get("content-type") ?? contentType,
     "Cache-Control": "no-store",
@@ -227,7 +229,7 @@ async function proxyReport(upstream: Response): Promise<NextResponse> {
   });
   const disposition = safeContentDisposition(upstream.headers.get("content-disposition"));
   if (disposition !== null) headers.set("Content-Disposition", disposition);
-  return new NextResponse(body, { status: upstream.status, headers });
+  return new NextResponse(responseBody, { status: upstream.status, headers });
 }
 
 async function proxy(request: NextRequest, context: RouteContext): Promise<NextResponse> {
