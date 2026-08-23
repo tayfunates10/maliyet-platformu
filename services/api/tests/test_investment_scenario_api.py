@@ -76,6 +76,7 @@ def test_viewer_member_can_calculate_tenant_private_analysis(app_db_session: Ses
     assert snapshot["investment"]["roic_ratio"] == "0.15"
     assert [item["profit"] for item in snapshot["scenarios"]] == ["50", "200", "350"]
     assert snapshot["policy"]["scenario_shocks_inferred"] is False
+    assert snapshot["inputs"] == _payload()
 
 
 def test_authenticated_user_cannot_cross_tenant_boundary(app_db_session: Session) -> None:
@@ -119,6 +120,43 @@ def test_non_finite_decimal_string_is_rejected(app_db_session: Session) -> None:
 
     assert response.status_code == 422
     assert response.json()["detail"] == "net_return must be finite"
+
+
+def test_decimal_exponent_outside_supported_range_is_rejected(app_db_session: Session) -> None:
+    _, organization, token = _tenant(app_db_session, suffix="exponent")
+    payload = _payload()
+    payload["net_return"] = "1e1000000"
+
+    response = TestClient(app).post(
+        _path(organization),
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "net_return exceeds supported decimal exponent range"
+
+
+def test_large_scenario_values_do_not_use_ambient_decimal_precision(
+    app_db_session: Session,
+) -> None:
+    _, organization, token = _tenant(app_db_session, suffix="large")
+    payload = _payload()
+    scenarios = payload["scenarios"]
+    assert isinstance(scenarios, list)
+    scenarios[0] = {"key": "pessimistic", "revenue": "1e120", "costs": "1"}
+    scenarios[1] = {"key": "normal", "revenue": "2e120", "costs": "1"}
+    scenarios[2] = {"key": "optimistic", "revenue": "3e120", "costs": "1"}
+
+    response = TestClient(app).post(
+        _path(organization),
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    profits = [item["profit"] for item in response.json()["snapshot"]["scenarios"]]
+    assert profits[0] == "999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999"
 
 
 def test_mislabeled_scenario_profit_order_fails_closed(app_db_session: Session) -> None:
