@@ -72,7 +72,7 @@ jobs:
         working-directory: apps/web
     env:
       NEXT_TELEMETRY_DISABLED: "1"
-      NEXT_PUBLIC_API_BASE_URL: "https://api.example.invalid"
+      API_BASE_URL: "https://api.example.invalid"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
