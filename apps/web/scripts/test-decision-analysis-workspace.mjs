@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { preserveSuccessfulPrimaryResult } from "../lib/decision-analysis-workspace-flow.ts";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const apiClient = readFileSync(resolve(webRoot, "lib/decision-analysis-api.ts"), "utf8");
@@ -59,9 +60,38 @@ assert.match(workspace, /"pessimistic"/);
 assert.match(workspace, /"normal"/);
 assert.match(workspace, /"optimistic"/);
 assert.match(workspace, /exactRatio/);
+assert.match(workspace, /Oturum açıldı; analiz geçmişi bu istekte yüklenemedi\. Oturum korunuyor\./);
+assert.match(workspace, /Karar analizi kaydedildi; geçmiş listesi bu istekte yenilenemedi/);
+const tokenCommit = workspace.indexOf("setToken(nextToken)");
+const initialHistoryFetch = workspace.indexOf("listDecisionAnalysisHistory(nextToken, nextOrganizationId)");
+assert.ok(tokenCommit >= 0 && initialHistoryFetch > tokenCommit, "session must be committed before optional history refresh");
 assert.doesNotMatch(workspace, /parseFloat|parseInt|Number\(|Intl\.NumberFormat/);
 assert.doesNotMatch(workspace, /dangerouslySetInnerHTML|innerHTML|eval|Function\(/);
 assert.doesNotMatch(workspace, /(?:value|defaultValue|data-[\w-]+|aria-[\w-]+)=\{token\}|>\s*\{token\}\s*</);
+
+const retainedSession = await preserveSuccessfulPrimaryResult(
+  async () => Object.freeze({ token: "opaque-session", organizationId: "tenant-a" }),
+  async () => {
+    throw new Error("history unavailable");
+  },
+);
+assert.equal(retainedSession.refreshed, false);
+assert.equal(retainedSession.result.token, "opaque-session");
+assert.equal(retainedSession.result.organizationId, "tenant-a");
+
+let createCount = 0;
+const retainedCreation = await preserveSuccessfulPrimaryResult(
+  async () => {
+    createCount += 1;
+    return Object.freeze({ artifactId: "artifact-1" });
+  },
+  async () => {
+    throw new Error("history refresh unavailable");
+  },
+);
+assert.equal(createCount, 1, "history refresh failure must not rerun immutable artifact creation");
+assert.equal(retainedCreation.refreshed, false);
+assert.equal(retainedCreation.result.artifactId, "artifact-1");
 
 assert.match(page, /DecisionAnalysisWorkspace/);
 assert.match(page, /server-side Decimal motorundan gelir/);
