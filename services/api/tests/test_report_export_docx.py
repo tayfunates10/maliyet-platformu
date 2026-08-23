@@ -63,7 +63,12 @@ def test_docx_export_is_deterministic_unicode_and_xml_safe() -> None:
     assert "_x005F_x0001_" in text_values
 
 
-def _tenant(session: Session, *, suffix: str, role: str = "owner") -> tuple[User, Organization, str]:
+def _tenant(
+    session: Session,
+    *,
+    suffix: str,
+    role: str = "owner",
+) -> tuple[User, Organization, str]:
     user = User(email=f"docx-{suffix}@example.test", display_name=f"DOCX {suffix}")
     organization = Organization(slug=f"docx-{suffix}", legal_name=f"DOCX {suffix} Org")
     session.add_all([user, organization])
@@ -87,8 +92,13 @@ def _headers(raw_token: str) -> dict[str, str]:
 def test_authorized_viewer_can_download_docx(app_db_session: Session) -> None:
     owner, organization, owner_token = _tenant(app_db_session, suffix="owner")
     viewer, _, viewer_token = _tenant(app_db_session, suffix="viewer", role="viewer")
-    viewer_membership = app_db_session.query(OrganizationMembership).filter_by(user_id=viewer.id).one()
-    viewer_membership.organization_id = organization.id
+    app_db_session.add(
+        OrganizationMembership(
+            organization_id=organization.id,
+            user_id=viewer.id,
+            role="viewer",
+        )
+    )
     app_db_session.flush()
 
     calculation = Calculation(
