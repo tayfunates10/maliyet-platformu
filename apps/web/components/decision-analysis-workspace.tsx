@@ -9,8 +9,11 @@ import {
   WorkspaceApiError,
 } from "@/lib/calculation-workspace-api";
 import {
+  type DecisionAnalysisArtifact,
+  type DecisionAnalysisHistoryItem,
   type DecisionAnalysisInput,
-  type DecisionAnalysisResult,
+  getDecisionAnalysisArtifact,
+  listDecisionAnalysisHistory,
   runDecisionAnalysis,
   type ScenarioKey,
 } from "@/lib/decision-analysis-api";
@@ -31,6 +34,8 @@ function friendlyError(error: unknown): string {
     if (error.code === "authentication_required") return "Oturum doğrulanamadı.";
     if (error.code === "access_denied") return "Bu organizasyon için erişim yetkiniz yok.";
     if (error.code === "invalid_request") return "Yatırım veya senaryo girdileri geçersiz.";
+    if (error.code === "analysis_not_found") return "Seçilen geçmiş analiz bulunamadı.";
+    if (error.code === "integrity_failed") return "Geçmiş analiz bütünlük kontrolünü geçemedi.";
     if (error.code === "rate_limited") return "İstek sınırına ulaşıldı. Daha sonra tekrar deneyin.";
   }
   return "Karar analizi tamamlanamadı. Girdileri kontrol edip tekrar deneyin.";
@@ -53,7 +58,8 @@ export function DecisionAnalysisWorkspace() {
   const [investedCapital, setInvestedCapital] = useState("");
   const [nopat, setNopat] = useState("");
   const [scenarios, setScenarios] = useState<readonly ScenarioDraft[]>(INITIAL_SCENARIOS);
-  const [result, setResult] = useState<DecisionAnalysisResult | null>(null);
+  const [history, setHistory] = useState<readonly DecisionAnalysisHistoryItem[]>([]);
+  const [result, setResult] = useState<DecisionAnalysisArtifact | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
@@ -65,14 +71,32 @@ export function DecisionAnalysisWorkspace() {
       const nextToken = await loginWorkspace(email.trim(), password);
       setPassword("");
       const nextOrganizations = await listWorkspaceOrganizations(nextToken);
+      const nextOrganizationId = nextOrganizations[0]?.id ?? "";
+
       setToken(nextToken);
       setOrganizations(nextOrganizations);
-      setOrganizationId(nextOrganizations[0]?.id ?? "");
-      setNotice({ kind: "success", text: "Oturum açıldı. Karar analizi çalışma alanı hazır." });
+      setOrganizationId(nextOrganizationId);
+      setHistory([]);
+
+      if (nextOrganizationId === "") {
+        setNotice({ kind: "success", text: "Oturum açıldı. Karar analizi çalışma alanı hazır." });
+        return;
+      }
+
+      try {
+        setHistory(await listDecisionAnalysisHistory(nextToken, nextOrganizationId));
+        setNotice({ kind: "success", text: "Oturum açıldı. Karar analizi çalışma alanı hazır." });
+      } catch {
+        setNotice({
+          kind: "info",
+          text: "Oturum açıldı; analiz geçmişi bu istekte yüklenemedi. Oturum korunuyor.",
+        });
+      }
     } catch (error) {
       setToken(null);
       setOrganizations([]);
       setOrganizationId("");
+      setHistory([]);
       setPassword("");
       setNotice({ kind: "error", text: friendlyError(error) });
     } finally {
@@ -91,6 +115,22 @@ export function DecisionAnalysisWorkspace() {
     setResult(null);
   }
 
+  async function changeOrganization(nextOrganizationId: string) {
+    setOrganizationId(nextOrganizationId);
+    setResult(null);
+    setHistory([]);
+    if (token === null || nextOrganizationId === "") return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      setHistory(await listDecisionAnalysisHistory(token, nextOrganizationId));
+    } catch (error) {
+      setNotice({ kind: "error", text: friendlyError(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (token === null || organizationId === "") return;
@@ -107,9 +147,33 @@ export function DecisionAnalysisWorkspace() {
     setNotice(null);
     setResult(null);
     try {
-      setResult(await runDecisionAnalysis(token, organizationId, input));
-      setNotice({ kind: "success", text: "Karar analizi hesaplandı." });
+      const created = await runDecisionAnalysis(token, organizationId, input);
+      setResult(created);
+      try {
+        setHistory(await listDecisionAnalysisHistory(token, organizationId));
+        setNotice({ kind: "success", text: "Karar analizi hesaplandı ve geçmişe kaydedildi." });
+      } catch {
+        setNotice({
+          kind: "info",
+          text: "Karar analizi kaydedildi; geçmiş listesi bu istekte yenilenemedi. Aynı analizi tekrar çalıştırmayın.",
+        });
+      }
     } catch (error) {
+      setNotice({ kind: "error", text: friendlyError(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openHistoricalArtifact(artifactId: string) {
+    if (token === null || organizationId === "") return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      setResult(await getDecisionAnalysisArtifact(token, organizationId, artifactId));
+      setNotice({ kind: "info", text: "Doğrulanmış geçmiş analiz açıldı; engine yeniden çalıştırılmadı." });
+    } catch (error) {
+      setResult(null);
       setNotice({ kind: "error", text: friendlyError(error) });
     } finally {
       setBusy(false);
@@ -124,6 +188,7 @@ export function DecisionAnalysisWorkspace() {
       setToken(null);
       setOrganizations([]);
       setOrganizationId("");
+      setHistory([]);
       setResult(null);
       setPassword("");
       setNotice({ kind: "info", text: "Sunucu oturumu kapatıldı ve yerel oturum bilgisi temizlendi." });
@@ -168,7 +233,7 @@ export function DecisionAnalysisWorkspace() {
       <form className={styles.form} onSubmit={handleSubmit}>
         <label>
           Organizasyon
-          <select value={organizationId} onChange={(event) => { setOrganizationId(event.target.value); setResult(null); }} disabled={busy}>
+          <select value={organizationId} onChange={(event) => void changeOrganization(event.target.value)} disabled={busy}>
             {organizations.length === 0 ? <option value="">Organizasyon bulunamadı</option> : null}
             {organizations.map((organization) => (
               <option key={organization.id} value={organization.id}>{organization.legal_name} · {organization.role}</option>
@@ -200,16 +265,42 @@ export function DecisionAnalysisWorkspace() {
 
       {notice !== null ? <p className={styles.notice} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</p> : null}
 
+      <div className={styles.panel}>
+        <h3>Doğrulanabilir analiz geçmişi</h3>
+        <p>Son 50 kayıt listelenir. Bir kayıt açıldığında backend stored snapshot SHA-256 bütünlüğünü doğrular.</p>
+        {history.length === 0 ? (
+          <p>Bu organizasyon için kayıtlı analiz yok.</p>
+        ) : (
+          <ul className={styles.list}>
+            {history.map((item) => (
+              <li key={item.artifact_id}>
+                <div>
+                  <strong>{item.engine_version}</strong>
+                  <time dateTime={item.created_at}>{item.created_at}</time>
+                </div>
+                <button type="button" className={styles.secondary} disabled={busy} onClick={() => void openHistoricalArtifact(item.artifact_id)}>
+                  Doğrula ve aç
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {result !== null ? (
         <div className={styles.panel} aria-live="polite">
           <h3>Sonuç</h3>
-          <p>Motor: {result.engine_version}</p>
+          <p>Artifact: {result.artifact_id}</p>
+          <p>Oluşturulma: <time dateTime={result.created_at}>{result.created_at}</time></p>
+          <p>Input SHA-256: <code>{result.input_sha256}</code></p>
+          <p>Output SHA-256: <code>{result.output_sha256}</code></p>
+          <p>Motor: {result.result.engine_version}</p>
           <p>Oranlar backend tarafından üretilen exact Decimal metinleridir; tarayıcıda yeniden hesaplanmaz.</p>
           <ul className={styles.list}>
-            <li><strong>ROI oranı</strong><span>{exactRatio(result.roi_ratio)}</span></li>
-            <li><strong>ROE oranı</strong><span>{exactRatio(result.roe_ratio)}</span></li>
-            <li><strong>ROIC oranı</strong><span>{exactRatio(result.roic_ratio)}</span></li>
-            {result.scenarios.map((scenario) => (
+            <li><strong>ROI oranı</strong><span>{exactRatio(result.result.roi_ratio)}</span></li>
+            <li><strong>ROE oranı</strong><span>{exactRatio(result.result.roe_ratio)}</span></li>
+            <li><strong>ROIC oranı</strong><span>{exactRatio(result.result.roic_ratio)}</span></li>
+            {result.result.scenarios.map((scenario) => (
               <li key={scenario.key}>
                 <div><strong>{scenario.key}</strong><span>Kâr: {scenario.profit}</span></div>
                 <span>Marj oranı: {exactRatio(scenario.profit_margin_ratio)}</span>
