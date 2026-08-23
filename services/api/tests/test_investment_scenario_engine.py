@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
 import pytest
 
@@ -41,6 +41,39 @@ def test_roi_roe_roic_use_explicit_decimal_inputs() -> None:
     assert metrics.roi_ratio == Decimal("0.15")
     assert metrics.roe_ratio == Decimal("0.15")
     assert metrics.roic_ratio == Decimal("0.12")
+
+
+def test_ratio_results_ignore_caller_decimal_context() -> None:
+    inputs = InvestmentMetricInputs(
+        initial_investment=Decimal("3"),
+        net_return=Decimal("1"),
+        equity=Decimal("3"),
+        net_income=Decimal("1"),
+        invested_capital=Decimal("3"),
+        net_operating_profit_after_tax=Decimal("1"),
+    )
+    cases = (
+        ScenarioCase("pessimistic", Decimal("3"), Decimal("2")),
+        ScenarioCase("normal", Decimal("6"), Decimal("4")),
+        ScenarioCase("optimistic", Decimal("9"), Decimal("6")),
+    )
+
+    with localcontext() as context:
+        context.prec = 5
+        low_precision_metrics = calculate_investment_metrics(inputs)
+        low_precision_scenarios = calculate_scenarios(cases)
+
+    with localcontext() as context:
+        context.prec = 50
+        high_precision_metrics = calculate_investment_metrics(inputs)
+        high_precision_scenarios = calculate_scenarios(cases)
+
+    expected_ratio = Decimal("0.33333333333333333333333333333333333333")
+    assert low_precision_metrics.roi_ratio == expected_ratio
+    assert high_precision_metrics.roi_ratio == expected_ratio
+    assert low_precision_metrics == high_precision_metrics
+    assert low_precision_scenarios == high_precision_scenarios
+    assert low_precision_scenarios[0].profit_margin_ratio == expected_ratio
 
 
 def test_negative_returns_are_preserved() -> None:
@@ -161,6 +194,8 @@ def test_snapshot_preserves_decimal_strings_and_policy_boundaries() -> None:
     policy = snapshot["policy"]
     assert isinstance(policy, dict)
     assert policy == {
+        "ratio_precision": 38,
+        "ratio_rounding": "ROUND_HALF_EVEN",
         "tax_rate_inferred": False,
         "financing_mix_inferred": False,
         "inflation_inferred": False,
