@@ -138,8 +138,15 @@ export function DecisionAnalysisWorkspace() {
     try {
       const created = await runDecisionAnalysis(token, organizationId, input);
       setResult(created);
-      setHistory(await listDecisionAnalysisHistory(token, organizationId));
-      setNotice({ kind: "success", text: "Karar analizi hesaplandı ve geçmişe kaydedildi." });
+      try {
+        setHistory(await listDecisionAnalysisHistory(token, organizationId));
+        setNotice({ kind: "success", text: "Karar analizi hesaplandı ve geçmişe kaydedildi." });
+      } catch {
+        setNotice({
+          kind: "info",
+          text: "Karar analizi kaydedildi; geçmiş listesi bu istekte yenilenemedi. Aynı analizi tekrar çalıştırmayın.",
+        });
+      }
     } catch (error) {
       setNotice({ kind: "error", text: friendlyError(error) });
     } finally {
