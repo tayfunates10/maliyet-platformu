@@ -170,13 +170,56 @@ function safeContentDisposition(value: string | null): string | null {
   return /^attachment; filename="[A-Za-z0-9._-]+"$/.test(value) ? value : null;
 }
 
+function declaredReportSize(upstream: Response): number | null {
+  const raw = upstream.headers.get("content-length");
+  if (raw === null || !/^\d+$/.test(raw)) return null;
+  const size = Number(raw);
+  return Number.isSafeInteger(size) ? size : null;
+}
+
+async function readBoundedReportBody(upstream: Response): Promise<Uint8Array | null> {
+  const declaredSize = declaredReportSize(upstream);
+  if (declaredSize !== null && declaredSize > MAX_REPORT_BYTES) {
+    await upstream.body?.cancel();
+    return null;
+  }
+  if (upstream.body === null) return new Uint8Array();
+
+  const reader = upstream.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_REPORT_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
 async function proxyReport(upstream: Response): Promise<NextResponse> {
   const contentType = upstream.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
   if (!REPORT_CONTENT_TYPES.includes(contentType)) {
+    await upstream.body?.cancel();
     return genericJson(502, "management upstream returned invalid report content");
   }
-  const body = await upstream.arrayBuffer();
-  if (body.byteLength > MAX_REPORT_BYTES) return genericJson(502, "management upstream report too large");
+  const body = await readBoundedReportBody(upstream);
+  if (body === null) return genericJson(502, "management upstream report too large");
   const headers = new Headers({
     "Content-Type": upstream.headers.get("content-type") ?? contentType,
     "Cache-Control": "no-store",
