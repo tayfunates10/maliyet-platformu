@@ -77,8 +77,24 @@ const runtimeConfig = readFileSync(resolve(root, "lib/runtime-config.ts"), "utf8
 if (!runtimeConfig.includes('process.env.NODE_ENV === "production"')) {
   throw new Error("Production API base configuration must fail closed when missing");
 }
+if (!runtimeConfig.includes("process.env.API_BASE_URL")) {
+  throw new Error("Management API origin must come from a server-only runtime variable");
+}
+if (runtimeConfig.includes("NEXT_PUBLIC_API_BASE_URL")) {
+  throw new Error("Management API origin must not depend on build-inlined NEXT_PUBLIC variables");
+}
 if (!runtimeConfig.includes('url.protocol !== "https:"')) {
   throw new Error("Production API base configuration must enforce HTTPS");
+}
+
+const managementProxy = readFileSync(resolve(root, "app/api/management/[...path]/route.ts"), "utf8");
+if (!managementProxy.includes("getServerApiBaseUrl")) {
+  throw new Error("Management proxy must resolve its upstream from server runtime configuration");
+}
+
+const envExample = readFileSync(resolve(root, ".env.example"), "utf8");
+if (!envExample.includes("API_BASE_URL=http://localhost:8000") || envExample.includes("NEXT_PUBLIC_API_BASE_URL")) {
+  throw new Error("Environment example must document only the server-side API base variable");
 }
 
 const nextConfig = readFileSync(resolve(root, "next.config.mjs"), "utf8");
