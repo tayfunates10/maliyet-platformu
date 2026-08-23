@@ -22,6 +22,9 @@ export default function HomePage() {
         <Link className="managementLink" href="/calculations">
           Hesaplama çalışma alanına git →
         </Link>
+        <Link className="managementLink" href="/decision-analysis">
+          Yatırım ve senaryo analizine git →
+        </Link>
         <Link className="managementLink" href="/widget-branding">
           Widget branding yönetimine git →
         </Link>

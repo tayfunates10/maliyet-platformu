@@ -91,5 +91,7 @@ jobs:
         run: npm run management:test
       - name: Calculation workspace contract
         run: npm run calculation:test
+      - name: Decision analysis workspace contract
+        run: npm run decision:test
       - name: Next.js build
         run: npm run build
