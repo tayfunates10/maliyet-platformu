@@ -145,9 +145,7 @@ def calculate_investment_scenario_analysis(
             "equity": str(metric_inputs.equity),
             "net_income": str(metric_inputs.net_income),
             "invested_capital": str(metric_inputs.invested_capital),
-            "net_operating_profit_after_tax": str(
-                metric_inputs.net_operating_profit_after_tax
-            ),
+            "net_operating_profit_after_tax": str(metric_inputs.net_operating_profit_after_tax),
             "scenarios": [
                 {
                     "key": item.key,
