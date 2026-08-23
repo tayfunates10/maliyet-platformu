@@ -8,6 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth_context import AuthenticatedIdentity, AuthorizationError, resolve_actor_context
+from app.calculation_orchestration import (
+    CalculationIntegrityError,
+    verify_calculation_version_integrity,
+)
 from app.http_dependencies import get_authenticated_identity, get_database_session
 from app.models import Calculation, CalculationVersion
 from app.report_export import build_calculation_report_csv
@@ -53,11 +57,18 @@ def _authorized_calculation_version(
     )
     if version is None:
         raise HTTPException(status_code=404, detail="calculation version not found")
+    try:
+        verify_calculation_version_integrity(version)
+    except CalculationIntegrityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="calculation version integrity verification failed",
+        ) from exc
     return calculation, version
 
 
 @router.get(
-    "/organizations/{organization_id}/calculations/{calculation_id}/versions/{version_number}/report.csv",
+    "/{organization_id}/calculations/{calculation_id}/versions/{version_number}/report.csv",
     response_class=Response,
 )
 def export_calculation_report_csv(
