@@ -72,15 +72,26 @@ export function DecisionAnalysisWorkspace() {
       setPassword("");
       const nextOrganizations = await listWorkspaceOrganizations(nextToken);
       const nextOrganizationId = nextOrganizations[0]?.id ?? "";
-      const nextHistory =
-        nextOrganizationId === ""
-          ? Object.freeze([])
-          : await listDecisionAnalysisHistory(nextToken, nextOrganizationId);
+
       setToken(nextToken);
       setOrganizations(nextOrganizations);
       setOrganizationId(nextOrganizationId);
-      setHistory(nextHistory);
-      setNotice({ kind: "success", text: "Oturum açıldı. Karar analizi çalışma alanı hazır." });
+      setHistory([]);
+
+      if (nextOrganizationId === "") {
+        setNotice({ kind: "success", text: "Oturum açıldı. Karar analizi çalışma alanı hazır." });
+        return;
+      }
+
+      try {
+        setHistory(await listDecisionAnalysisHistory(nextToken, nextOrganizationId));
+        setNotice({ kind: "success", text: "Oturum açıldı. Karar analizi çalışma alanı hazır." });
+      } catch {
+        setNotice({
+          kind: "info",
+          text: "Oturum açıldı; analiz geçmişi bu istekte yüklenemedi. Oturum korunuyor.",
+        });
+      }
     } catch (error) {
       setToken(null);
       setOrganizations([]);
