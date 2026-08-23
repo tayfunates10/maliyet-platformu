@@ -215,9 +215,7 @@ def build_calculation_report_xlsx(
 def _docx_document(rows: list[tuple[str, str, str]]) -> bytes:
     row_xml = []
     for row in rows:
-        cells = "".join(
-            f"<w:tc><w:p><w:r>{_ooxml_text(value)}</w:r></w:p></w:tc>" for value in row
-        )
+        cells = "".join(f"<w:tc><w:p><w:r>{_ooxml_text(value)}</w:r></w:p></w:tc>" for value in row)
         row_xml.append(f"<w:tr>{cells}</w:tr>")
     document = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
