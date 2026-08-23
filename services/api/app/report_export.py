@@ -122,10 +122,7 @@ def _xlsx_cell(column: str, row_number: int, value: str) -> str:
 
     escaped = escape(_ooxml_escape_text(value), {'"': "&quot;"})
     preserve = ' xml:space="preserve"' if value != value.strip() else ""
-    return (
-        f'<c r="{column}{row_number}" t="inlineStr">'
-        f"<is><t{preserve}>{escaped}</t></is></c>"
-    )
+    return f'<c r="{column}{row_number}" t="inlineStr"><is><t{preserve}>{escaped}</t></is></c>'
 
 
 def _xlsx_sheet(rows: list[tuple[str, str, str]]) -> bytes:
@@ -139,9 +136,7 @@ def _xlsx_sheet(rows: list[tuple[str, str, str]]) -> bytes:
     document = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-        '<sheetData>'
-        + "".join(row_xml)
-        + '</sheetData></worksheet>'
+        "<sheetData>" + "".join(row_xml) + "</sheetData></worksheet>"
     )
     return document.encode("utf-8")
 
@@ -178,7 +173,7 @@ def build_calculation_report_xlsx(
             b'<Override PartName="/xl/worksheets/sheet1.xml" '
             b'ContentType="application/vnd.openxmlformats-officedocument.'
             b'spreadsheetml.worksheet+xml"/>'
-            b'</Types>'
+            b"</Types>"
         ),
         "_rels/.rels": (
             b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -187,7 +182,7 @@ def build_calculation_report_xlsx(
             b'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/'
             b'officeDocument/2006/relationships/officeDocument" '
             b'Target="xl/workbook.xml"/>'
-            b'</Relationships>'
+            b"</Relationships>"
         ),
         "xl/workbook.xml": (
             b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -195,7 +190,7 @@ def build_calculation_report_xlsx(
             b'2006/main" xmlns:r="http://schemas.openxmlformats.org/'
             b'officeDocument/2006/relationships">'
             b'<sheets><sheet name="Calculation" sheetId="1" r:id="rId1"/>'
-            b'</sheets></workbook>'
+            b"</sheets></workbook>"
         ),
         "xl/_rels/workbook.xml.rels": (
             b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -204,7 +199,7 @@ def build_calculation_report_xlsx(
             b'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/'
             b'officeDocument/2006/relationships/worksheet" '
             b'Target="worksheets/sheet1.xml"/>'
-            b'</Relationships>'
+            b"</Relationships>"
         ),
         "xl/worksheets/sheet1.xml": _xlsx_sheet(rows),
     }
