@@ -1,0 +1,55 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const apiClient = readFileSync(resolve(webRoot, "lib/decision-analysis-api.ts"), "utf8");
+const workspace = readFileSync(resolve(webRoot, "components/decision-analysis-workspace.tsx"), "utf8");
+const proxy = readFileSync(resolve(webRoot, "app/api/management/[...path]/route.ts"), "utf8");
+const page = readFileSync(resolve(webRoot, "app/decision-analysis/page.tsx"), "utf8");
+
+for (const source of [apiClient, workspace, proxy]) {
+  assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB|document\.cookie/);
+  assert.doesNotMatch(source, /console\.(?:log|debug|info|warn|error)/);
+}
+
+assert.match(apiClient, /const MANAGEMENT_PREFIX = "\/api\/management"/);
+assert.match(apiClient, /decision-analysis\/investment-scenarios/);
+assert.match(apiClient, /Authorization: `Bearer \$\{token\}`/);
+assert.match(apiClient, /credentials:\s*"omit"/);
+assert.match(apiClient, /cache:\s*"no-store"/);
+assert.match(apiClient, /redirect:\s*"error"/);
+assert.match(apiClient, /referrerPolicy:\s*"no-referrer"/);
+assert.match(apiClient, /scenarios\.length !== 3/);
+assert.match(apiClient, /scenarios\[0\]\?\.key !== "pessimistic"/);
+assert.match(apiClient, /scenarios\[1\]\?\.key !== "normal"/);
+assert.match(apiClient, /scenarios\[2\]\?\.key !== "optimistic"/);
+assert.doesNotMatch(apiClient, /parseFloat|parseInt|Number\(/);
+assert.doesNotMatch(apiClient, /fetch\(\s*["'`]https?:\/\//);
+
+assert.match(proxy, /organizations\/\$\{UUID\}\/decision-analysis\/investment-scenarios/);
+assert.match(proxy, /authenticated:\s*true/);
+assert.match(proxy, /authorization\.startsWith\("Bearer "\)/);
+assert.match(proxy, /MAX_BODY_BYTES = 16_384/);
+assert.doesNotMatch(proxy, /Access-Control-Allow-Origin/);
+assert.doesNotMatch(proxy, /\^.*\.\*.*\$/);
+
+assert.match(workspace, /type="password"/);
+assert.match(workspace, /setPassword\(""\)/);
+assert.match(workspace, /setToken\(null\)/);
+assert.match(workspace, /await logoutWorkspace\(token\)/);
+assert.match(workspace, /runDecisionAnalysis/);
+assert.match(workspace, /"pessimistic"/);
+assert.match(workspace, /"normal"/);
+assert.match(workspace, /"optimistic"/);
+assert.match(workspace, /exactRatio/);
+assert.doesNotMatch(workspace, /parseFloat|parseInt|Number\(|Intl\.NumberFormat/);
+assert.doesNotMatch(workspace, /dangerouslySetInnerHTML|innerHTML|eval|Function\(/);
+assert.doesNotMatch(workspace, /(?:value|defaultValue|data-[\w-]+|aria-[\w-]+)=\{token\}|>\s*\{token\}\s*</);
+
+assert.match(page, /DecisionAnalysisWorkspace/);
+assert.match(page, /server-side Decimal motorundan gelir/);
+assert.match(page, /vergi oranı, finansman karması, enflasyon, iskonto oranı veya senaryo şoku üretmez/);
+
+console.log("Decision analysis workspace security contract: PASS");
