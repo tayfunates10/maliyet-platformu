@@ -92,7 +92,7 @@ def test_large_scenario_subtraction_ignores_caller_decimal_context() -> None:
         high_precision = calculate_scenarios(cases)
 
     assert low_precision == high_precision
-    assert low_precision[0].profit == Decimal("1e120") - Decimal("1")
+    assert low_precision[0].profit == Decimal("9" * 120)
 
 
 def test_negative_returns_are_preserved() -> None:
