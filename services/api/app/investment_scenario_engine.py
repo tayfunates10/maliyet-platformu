@@ -16,6 +16,7 @@ ZERO = Decimal("0")
 SCENARIO_KEYS = ("pessimistic", "normal", "optimistic")
 RATIO_PRECISION = 38
 RATIO_ROUNDING = ROUND_HALF_EVEN
+ARITHMETIC_PRECISION = 256
 
 
 class InvestmentScenarioInputError(ValueError):
@@ -50,6 +51,14 @@ def _divide_ratio(numerator: Decimal, denominator: Decimal) -> Decimal:
     context = Context(prec=RATIO_PRECISION, rounding=RATIO_ROUNDING)
     with localcontext(context):
         return numerator / denominator
+
+
+def _subtract_money(left: Decimal, right: Decimal) -> Decimal:
+    """Subtract monetary inputs independently from the caller Decimal context."""
+
+    context = Context(prec=ARITHMETIC_PRECISION, rounding=RATIO_ROUNDING)
+    with localcontext(context):
+        return left - right
 
 
 @dataclass(frozen=True)
@@ -154,7 +163,7 @@ def calculate_scenarios(cases: Sequence[ScenarioCase]) -> tuple[ScenarioOutcome,
     outcomes: list[ScenarioOutcome] = []
     for key in SCENARIO_KEYS:
         case = by_key[key]
-        profit = case.revenue - case.costs
+        profit = _subtract_money(case.revenue, case.costs)
         margin = None if case.revenue == ZERO else _divide_ratio(profit, case.revenue)
         outcomes.append(
             ScenarioOutcome(
@@ -208,6 +217,7 @@ def build_investment_scenario_snapshot(
         "policy": {
             "ratio_precision": RATIO_PRECISION,
             "ratio_rounding": RATIO_ROUNDING,
+            "arithmetic_precision": ARITHMETIC_PRECISION,
             "tax_rate_inferred": False,
             "financing_mix_inferred": False,
             "inflation_inferred": False,

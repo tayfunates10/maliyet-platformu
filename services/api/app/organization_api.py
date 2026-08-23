@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.auth_context import AuthenticatedIdentity
 from app.http_dependencies import get_authenticated_identity, get_database_session
+from app.investment_scenario_api import router as investment_scenario_router
 from app.organization_onboarding import (
     OrganizationAccess,
     OrganizationAccessDenied,
@@ -40,6 +41,7 @@ router.include_router(widget_branding_profile_router)
 router.include_router(widget_branding_deployment_router)
 router.include_router(widget_deployment_discovery_router)
 router.include_router(report_export_router)
+router.include_router(investment_scenario_router)
 
 
 class OrganizationCreateRequest(BaseModel):
