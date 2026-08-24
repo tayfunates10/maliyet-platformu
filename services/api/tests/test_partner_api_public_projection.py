@@ -128,6 +128,36 @@ def test_partner_token_reads_only_customer_safe_projection(app_db_session: Sessi
     assert str(calculation.id) not in serialized
 
 
+def test_partner_bearer_scheme_is_case_insensitive(app_db_session: Session) -> None:
+    _, organization, calculation, user_token, partner = _tenant(
+        app_db_session,
+        suffix="bearer-case",
+    )
+    client = TestClient(app)
+    published = _publish(client, organization, calculation, user_token)
+
+    response = client.get(
+        _partner_path(str(published["projection_id"])),
+        headers={"Authorization": f"bearer {partner.raw_token}"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_partner_endpoint_declares_openapi_bearer_security_scheme() -> None:
+    schema = app.openapi()
+    security_schemes = schema["components"]["securitySchemes"]
+    assert security_schemes["PartnerApiBearer"] == {
+        "type": "http",
+        "description": "Tenant-scoped Partner API bearer credential.",
+        "scheme": "bearer",
+    }
+    operation = schema["paths"][
+        "/organizations/partner/v1/calculation-projections/{projection_id}"
+    ]["get"]
+    assert {"PartnerApiBearer": []} in operation["security"]
+
+
 def test_partner_projection_access_is_tenant_scoped(app_db_session: Session) -> None:
     _, first_org, first_calculation, first_user_token, _ = _tenant(
         app_db_session,
