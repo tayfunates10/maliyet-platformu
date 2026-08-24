@@ -33,7 +33,9 @@ def test_production_migration_ceremony_is_idempotent_at_head(db_engine: Engine) 
     target_head = run_production_migration_ceremony(_test_database_url())
 
     with db_engine.connect() as connection:
-        current_head = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+        current_head = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
 
     assert current_head == target_head
 
@@ -49,7 +51,10 @@ def test_production_migration_ceremony_refuses_concurrent_actor(db_engine: Engin
             connection.commit()
             assert locked is True
 
-            with pytest.raises(RuntimeError, match="another production migration ceremony is active"):
+            with pytest.raises(
+                RuntimeError,
+                match="another production migration ceremony is active",
+            ):
                 run_production_migration_ceremony(_test_database_url())
 
             connection.execute(
