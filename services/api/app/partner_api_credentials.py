@@ -1,4 +1,4 @@
-"""Issue, authenticate and revoke tenant-scoped partner API credentials."""
+"""Issue, authenticate, list and revoke tenant-scoped partner API credentials."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ PARTNER_API_TOKEN_PREFIX = "mp_live_"
 PARTNER_API_TOKEN_ENTROPY_BYTES = 32
 PARTNER_API_TOKEN_MAX_LENGTH = 96
 PARTNER_API_MANAGEMENT_ROLES = frozenset({"owner", "admin"})
+PARTNER_API_LIST_MAX_LIMIT = 100
 
 
 class PartnerApiCredentialError(ValueError):
@@ -96,6 +97,34 @@ def issue_partner_api_credential(
     )
     session.flush()
     return IssuedPartnerApiCredential(credential=credential, raw_token=raw_token)
+
+
+def list_partner_api_credentials(
+    session: Session,
+    *,
+    organization_id: UUID,
+    requested_by_user_id: UUID,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[PartnerApiCredential]:
+    """List bounded non-secret credential metadata for one tenant manager."""
+
+    if limit < 1 or limit > PARTNER_API_LIST_MAX_LIMIT or offset < 0:
+        raise PartnerApiCredentialError("invalid credential pagination")
+    _require_manager(
+        session,
+        organization_id=organization_id,
+        user_id=requested_by_user_id,
+    )
+    return list(
+        session.scalars(
+            select(PartnerApiCredential)
+            .where(PartnerApiCredential.organization_id == organization_id)
+            .order_by(PartnerApiCredential.created_at.desc(), PartnerApiCredential.id.desc())
+            .limit(limit)
+            .offset(offset)
+        ).all()
+    )
 
 
 def authenticate_partner_api_token(
