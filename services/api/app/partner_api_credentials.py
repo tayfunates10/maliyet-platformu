@@ -136,10 +136,12 @@ def revoke_partner_api_credential(
         user_id=revoked_by_user_id,
     )
     credential = session.scalar(
-        select(PartnerApiCredential).where(
+        select(PartnerApiCredential)
+        .where(
             PartnerApiCredential.id == credential_id,
             PartnerApiCredential.organization_id == organization_id,
         )
+        .with_for_update()
     )
     if credential is None:
         raise PartnerApiCredentialError("partner API credential not found")
