@@ -101,6 +101,17 @@ def _projection_response(projection: PublicCalculationProjection) -> PartnerProj
     )
 
 
+def _projection_list_item(projection: PublicCalculationProjection) -> PartnerProjectionListItem:
+    return PartnerProjectionListItem(
+        projection_id=projection.id,
+        title=projection.title,
+        currency=projection.currency,
+        estimate_min=_amount_text(projection.estimate_min),
+        estimate_max=_amount_text(projection.estimate_max),
+        published_at=projection.created_at,
+    )
+
+
 def _bounded_next_offset(*, offset: int, limit: int, has_more: bool) -> int | None:
     if not has_more:
         return None
@@ -144,13 +155,7 @@ def list_partner_calculation_projections(
     visible = projections[:limit]
     response.headers["Cache-Control"] = "no-store"
     return PartnerProjectionListResponse(
-        items=[
-            PartnerProjectionListItem(
-                projection_id=projection.id,
-                **_projection_response(projection).model_dump(),
-            )
-            for projection in visible
-        ],
+        items=[_projection_list_item(projection) for projection in visible],
         next_offset=_bounded_next_offset(offset=offset, limit=limit, has_more=has_more),
     )
 
