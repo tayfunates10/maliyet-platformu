@@ -1,6 +1,6 @@
 services:
   migrate:
-    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
+    image: ${API_IMAGE_REPOSITORY:?API_IMAGE_REPOSITORY is required}@sha256:${API_IMAGE_DIGEST:?API_IMAGE_DIGEST is required}
     command: ["python", "scripts/production_migrate.py"]
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
@@ -10,7 +10,7 @@ services:
       - /tmp:size=16m,mode=1777
 
   readiness:
-    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
+    image: ${API_IMAGE_REPOSITORY:?API_IMAGE_REPOSITORY is required}@sha256:${API_IMAGE_DIGEST:?API_IMAGE_DIGEST is required}
     command: ["python", "-m", "app.production_readiness"]
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
@@ -23,7 +23,7 @@ services:
       - /tmp:size=16m,mode=1777
 
   api:
-    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
+    image: ${API_IMAGE_REPOSITORY:?API_IMAGE_REPOSITORY is required}@sha256:${API_IMAGE_DIGEST:?API_IMAGE_DIGEST is required}
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
     depends_on:
@@ -37,7 +37,7 @@ services:
       - "127.0.0.1:${API_PORT:-8000}:8000"
 
   web:
-    image: ${WEB_IMAGE:?WEB_IMAGE must be an immutable image reference}
+    image: ${WEB_IMAGE_REPOSITORY:?WEB_IMAGE_REPOSITORY is required}@sha256:${WEB_IMAGE_DIGEST:?WEB_IMAGE_DIGEST is required}
     environment:
       API_BASE_URL: ${API_BASE_URL:?API_BASE_URL is required}
     depends_on:
