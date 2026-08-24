@@ -9,18 +9,55 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.auth_context import AuthenticatedIdentity, AuthenticationError, authenticate_session
 from app.database import build_engine, build_session_factory
 
 _DATABASE_URL_ENV = "DATABASE_URL"
+_ALLOWED_DATABASE_DRIVERS = frozenset({"postgresql", "postgresql+psycopg"})
 _bearer = HTTPBearer(auto_error=False)
+
+
+def validate_database_url(database_url: str) -> str:
+    """Validate the canonical PostgreSQL runtime URL without exposing credentials.
+
+    Maliyet Platformu's persistence and concurrency contracts are PostgreSQL-specific.
+    Accepting another dialect at runtime would silently bypass those guarantees, so
+    database-backed endpoints fail closed before constructing an engine.
+    """
+
+    value = database_url.strip()
+    if not value:
+        raise RuntimeError(f"{_DATABASE_URL_ENV} is required for database-backed endpoints")
+
+    try:
+        parsed = make_url(value)
+    except ArgumentError as exc:
+        raise RuntimeError(f"{_DATABASE_URL_ENV} is invalid") from exc
+
+    if parsed.drivername not in _ALLOWED_DATABASE_DRIVERS:
+        raise RuntimeError(f"{_DATABASE_URL_ENV} must use PostgreSQL with psycopg")
+    if not parsed.database:
+        raise RuntimeError(f"{_DATABASE_URL_ENV} must select a database")
+
+    return value
+
+
+def get_database_url() -> str:
+    """Resolve and validate the database URL at request time."""
+
+    value = os.environ.get(_DATABASE_URL_ENV)
+    if value is None:
+        raise RuntimeError(f"{_DATABASE_URL_ENV} is required for database-backed endpoints")
+    return validate_database_url(value)
 
 
 @lru_cache(maxsize=4)
 def _session_factory(database_url: str) -> sessionmaker[Session]:
-    """Cache the canonical session factory per configured database URL."""
+    """Cache the canonical session factory per validated database URL."""
 
     return build_session_factory(build_engine(database_url))
 
@@ -28,10 +65,7 @@ def _session_factory(database_url: str) -> sessionmaker[Session]:
 def get_database_session() -> Iterator[Session]:
     """Provide one request transaction and commit only after a successful response path."""
 
-    database_url = os.environ.get(_DATABASE_URL_ENV)
-    if not database_url:
-        raise RuntimeError(f"{_DATABASE_URL_ENV} is required for database-backed endpoints")
-
+    database_url = get_database_url()
     session = _session_factory(database_url)()
     try:
         yield session
