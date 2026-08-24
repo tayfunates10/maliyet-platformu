@@ -8,6 +8,7 @@ from alembic import command
 from app import (
     auth_context,
     decision_analysis_models,
+    partner_api_models,
     password_auth,
     rules_models,
     widget_branding_models,
@@ -28,6 +29,7 @@ def expected_tables() -> set[str]:
     assert password_auth.UserCredential.__tablename__ in Base.metadata.tables
     assert rules_models.RuleSource.__tablename__ in Base.metadata.tables
     assert decision_analysis_models.DecisionAnalysisArtifact.__tablename__ in Base.metadata.tables
+    assert partner_api_models.PartnerApiCredential.__tablename__ in Base.metadata.tables
     assert widget_branding_models.WidgetBrandingProfile.__tablename__ in Base.metadata.tables
     assert widget_branding_models.WidgetPresentationSnapshot.__tablename__ in Base.metadata.tables
     assert widget_branding_models.WidgetPublishedPresentation.__tablename__ in Base.metadata.tables
