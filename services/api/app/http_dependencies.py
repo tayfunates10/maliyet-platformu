@@ -35,7 +35,7 @@ def validate_database_url(database_url: str) -> str:
 
     try:
         parsed = make_url(value)
-        parsed.port
+        port = parsed.port
     except (ArgumentError, ValueError) as exc:
         raise RuntimeError(f"{_DATABASE_URL_ENV} is invalid") from exc
 
@@ -43,6 +43,8 @@ def validate_database_url(database_url: str) -> str:
         raise RuntimeError(f"{_DATABASE_URL_ENV} must use postgresql+psycopg")
     if not parsed.database:
         raise RuntimeError(f"{_DATABASE_URL_ENV} must select a database")
+    if port is not None and not 1 <= port <= 65535:
+        raise RuntimeError(f"{_DATABASE_URL_ENV} is invalid")
 
     return value
 
