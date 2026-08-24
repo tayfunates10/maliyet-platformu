@@ -36,8 +36,6 @@ def test_production_readiness_rejects_wrong_database_driver() -> None:
 def test_production_readiness_error_does_not_echo_credentials() -> None:
     secret = "super-secret-password"
     with pytest.raises(RuntimeError) as exc_info:
-        check_production_readiness(
-            f"postgresql+psycopg://user:{secret}@localhost:99999/maliyet"
-        )
+        check_production_readiness(f"postgresql+psycopg://user:{secret}@localhost:99999/maliyet")
 
     assert secret not in str(exc_info.value)
