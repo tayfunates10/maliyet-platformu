@@ -4,8 +4,8 @@ Revision ID: 0010_partner_api_credentials
 Revises: 0009_decision_artifacts
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0010_partner_api_credentials"
 down_revision = "0009_decision_artifacts"
