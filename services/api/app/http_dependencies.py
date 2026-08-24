@@ -35,7 +35,8 @@ def validate_database_url(database_url: str) -> str:
 
     try:
         parsed = make_url(value)
-    except ArgumentError as exc:
+        parsed.port
+    except (ArgumentError, ValueError) as exc:
         raise RuntimeError(f"{_DATABASE_URL_ENV} is invalid") from exc
 
     if parsed.drivername != _DATABASE_DRIVER:
