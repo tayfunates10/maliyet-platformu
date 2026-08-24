@@ -32,7 +32,7 @@ def test_validate_database_url_rejects_missing_database_name() -> None:
 def test_validate_database_url_rejects_malformed_value_without_echoing_secret() -> None:
     secret = "do-not-echo"
     with pytest.raises(RuntimeError, match="DATABASE_URL is invalid") as exc_info:
-        validate_database_url(f"postgresql+psycopg://app:{secret}@[bad-host/maliyet")
+        validate_database_url(f"postgresql+psycopg://app:{secret}@db.internal:bad-port/maliyet")
     assert secret not in str(exc_info.value)
 
 
