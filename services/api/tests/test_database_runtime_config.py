@@ -10,21 +10,17 @@ def test_validate_database_url_accepts_canonical_postgresql_psycopg() -> None:
     assert validate_database_url(value) == value
 
 
-def test_validate_database_url_accepts_postgresql_alias() -> None:
-    value = "postgresql://app:secret@db.internal:5432/maliyet"
-    assert validate_database_url(value) == value
-
-
 @pytest.mark.parametrize(
     "value",
     [
+        "postgresql://app:secret@db.internal/maliyet",
         "sqlite:///tmp/maliyet.db",
         "mysql://app:secret@db.internal/maliyet",
         "postgresql+asyncpg://app:secret@db.internal/maliyet",
     ],
 )
 def test_validate_database_url_rejects_noncanonical_drivers(value: str) -> None:
-    with pytest.raises(RuntimeError, match="must use PostgreSQL with psycopg"):
+    with pytest.raises(RuntimeError, match="must use postgresql\\+psycopg"):
         validate_database_url(value)
 
 
@@ -36,7 +32,7 @@ def test_validate_database_url_rejects_missing_database_name() -> None:
 def test_validate_database_url_rejects_malformed_value_without_echoing_secret() -> None:
     secret = "do-not-echo"
     with pytest.raises(RuntimeError, match="DATABASE_URL is invalid") as exc_info:
-        validate_database_url(f"postgresql://app:{secret}@[bad-host/maliyet")
+        validate_database_url(f"postgresql+psycopg://app:{secret}@[bad-host/maliyet")
     assert secret not in str(exc_info.value)
 
 
