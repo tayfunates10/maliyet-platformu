@@ -20,7 +20,11 @@ _MIGRATION_LOCK_KEY = 1_296_129_097
 def _alembic_config(database_url: str) -> Config:
     config = Config(str(_API_ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(_API_ROOT / "alembic"))
-    config.set_main_option("sqlalchemy.url", database_url)
+    # Alembic stores main options through ConfigParser interpolation. URL-encoded
+    # credentials may legitimately contain percent escapes (for example `%40`),
+    # so escape percent signs only at the ConfigParser boundary. Reading the
+    # option through Alembic yields the original validated URL again.
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
     return config
 
 
