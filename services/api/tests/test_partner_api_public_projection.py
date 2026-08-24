@@ -16,6 +16,7 @@ from app.partner_api_credentials import (
     issue_partner_api_credential,
     revoke_partner_api_credential,
 )
+from app.partner_api_public_api import _bounded_next_offset
 
 _PRIVATE_SENTINEL = "PRIVATE-COST-DO-NOT-LEAK"
 
@@ -177,6 +178,12 @@ def test_partner_projection_discovery_is_bounded_and_tenant_scoped(
         headers={"Authorization": f"Bearer {partner.raw_token}"},
     )
     assert oversized.status_code == 422
+
+
+def test_partner_projection_discovery_never_emits_unaccepted_offset() -> None:
+    assert _bounded_next_offset(offset=9_900, limit=100, has_more=True) == 10_000
+    assert _bounded_next_offset(offset=10_000, limit=100, has_more=True) is None
+    assert _bounded_next_offset(offset=9_950, limit=50, has_more=False) is None
 
 
 def test_partner_projection_discovery_hides_revoked_projection(
