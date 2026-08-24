@@ -9,6 +9,7 @@ from sqlalchemy import Engine, create_engine, text
 
 from app.production_migrations import (
     _MIGRATION_LOCK_KEY,
+    _alembic_config,
     run_production_migration_ceremony,
 )
 
@@ -18,6 +19,14 @@ def _test_database_url() -> str:
     if value is None:
         pytest.skip("TEST_DATABASE_URL is required for PostgreSQL integration tests")
     return value
+
+
+def test_alembic_config_preserves_percent_encoded_credentials() -> None:
+    database_url = "postgresql+psycopg://user:p%40ss@db.example.test:5432/maliyet"
+
+    config = _alembic_config(database_url)
+
+    assert config.get_main_option("sqlalchemy.url") == database_url
 
 
 def test_production_migration_ceremony_is_idempotent_at_head(db_engine: Engine) -> None:
