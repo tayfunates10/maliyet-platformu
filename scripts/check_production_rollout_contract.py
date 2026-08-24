@@ -29,6 +29,7 @@ def main() -> None:
     require(text, 'command: ["python", "scripts/production_migrate.py"]')
     require(text, 'command: ["python", "-m", "app.production_readiness"]')
     require(text, "condition: service_completed_successfully")
+    require(text, "condition: service_healthy")
     require(text, 'restart: "no"')
     require(text, "read_only: true")
     require(text, '"127.0.0.1:${API_PORT:-8000}:8000"')
