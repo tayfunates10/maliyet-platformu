@@ -46,7 +46,8 @@ assert.match(apiClient, /widget-deployments\/\$\{encodeURIComponent\(deploymentI
 assert.match(apiClient, /body:\s*\{ branding_profile_id: profileId \}/);
 assert.match(apiClient, /UUID_PATTERN/);
 
-assert.match(managementProxy, /getPublicApiBaseUrl/);
+assert.match(managementProxy, /getServerApiBaseUrl/);
+assert.doesNotMatch(managementProxy, /getPublicApiBaseUrl|NEXT_PUBLIC_API_BASE_URL/);
 assert.match(managementProxy, /parsed\.protocol === "https:"/);
 assert.match(managementProxy, /parsed\.protocol === "http:" && loopback/);
 assert.match(managementProxy, /const ROUTE_RULES/);
