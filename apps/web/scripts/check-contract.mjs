@@ -80,9 +80,6 @@ if (!runtimeConfig.includes('process.env.NODE_ENV === "production"')) {
 if (!runtimeConfig.includes("process.env.API_BASE_URL")) {
   throw new Error("Management API origin must come from a server-only runtime variable");
 }
-if (runtimeConfig.includes("NEXT_PUBLIC_API_BASE_URL")) {
-  throw new Error("Management API origin must not depend on build-inlined NEXT_PUBLIC variables");
-}
 if (!runtimeConfig.includes('url.protocol !== "https:"')) {
   throw new Error("Production API base configuration must enforce HTTPS");
 }
@@ -90,6 +87,17 @@ if (!runtimeConfig.includes('url.protocol !== "https:"')) {
 const managementProxy = readFileSync(resolve(root, "app/api/management/[...path]/route.ts"), "utf8");
 if (!managementProxy.includes("getServerApiBaseUrl")) {
   throw new Error("Management proxy must resolve its upstream from server runtime configuration");
+}
+if (managementProxy.includes("NEXT_PUBLIC_API_BASE_URL") || managementProxy.includes("getPublicApiBaseUrl")) {
+  throw new Error("Management proxy must not depend on build-inlined public API configuration");
+}
+
+const runtimeConfigTest = readFileSync(resolve(root, "scripts/test-runtime-config.mjs"), "utf8");
+if (!runtimeConfigTest.includes('process.env.NEXT_PUBLIC_API_BASE_URL = "https://build-placeholder.example.invalid"')) {
+  throw new Error("Runtime config regression must verify that a public build placeholder cannot satisfy server config");
+}
+if (!runtimeConfigTest.includes('resolveApiBase({ nodeEnv: "production", apiBase: undefined })')) {
+  throw new Error("Runtime config regression must verify missing production server config fails closed");
 }
 
 const envExample = readFileSync(resolve(root, ".env.example"), "utf8");
