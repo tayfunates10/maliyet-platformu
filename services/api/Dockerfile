@@ -11,6 +11,7 @@ COPY pyproject.toml ./
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
+COPY scripts ./scripts
 
 RUN python -m pip install . \
     && chown -R 10001:10001 /app
