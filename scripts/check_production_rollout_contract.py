@@ -22,8 +22,10 @@ def main() -> None:
     for service in ("migrate", "readiness", "api", "web"):
         require(text, f"  {service}:\n")
 
-    require(text, "${API_IMAGE:?API_IMAGE must be an immutable image reference}")
-    require(text, "${WEB_IMAGE:?WEB_IMAGE must be an immutable image reference}")
+    require(text, "${API_IMAGE_REPOSITORY:?API_IMAGE_REPOSITORY is required}@sha256:")
+    require(text, "${API_IMAGE_DIGEST:?API_IMAGE_DIGEST is required}")
+    require(text, "${WEB_IMAGE_REPOSITORY:?WEB_IMAGE_REPOSITORY is required}@sha256:")
+    require(text, "${WEB_IMAGE_DIGEST:?WEB_IMAGE_DIGEST is required}")
     require(text, "${DATABASE_URL:?DATABASE_URL is required}")
     require(text, "${API_BASE_URL:?API_BASE_URL is required}")
     require(text, 'command: ["python", "scripts/production_migrate.py"]')
