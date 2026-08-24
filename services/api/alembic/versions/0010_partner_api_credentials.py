@@ -5,6 +5,7 @@ Revises: 0009_decision_artifacts
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0010_partner_api_credentials"
