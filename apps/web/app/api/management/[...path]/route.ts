@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getPublicApiBaseUrl } from "@/lib/runtime-config";
+import { getServerApiBaseUrl } from "@/lib/runtime-config";
 
 const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}";
 const ENGINE_KEY = "[a-z][a-z0-9_]{0,79}";
@@ -108,7 +108,7 @@ const REPORT_CONTENT_TYPES = Object.freeze([
 function upstreamApiBase(): string {
   let parsed: URL;
   try {
-    parsed = new URL(getPublicApiBaseUrl().trim());
+    parsed = new URL(getServerApiBaseUrl().trim());
   } catch {
     throw new Error("invalid upstream API base");
   }

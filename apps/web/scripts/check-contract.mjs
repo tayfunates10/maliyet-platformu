@@ -22,6 +22,7 @@ const requiredFiles = [
   "public/widget/v1.1.0/styles.css",
   "public/widget/v1.2.0/loader.js",
   "public/widget/v1.2.0/styles.css",
+  "scripts/test-runtime-config.mjs",
   "scripts/test-widget-loader.mjs",
   "scripts/test-widget-theme-config.mjs",
   "scripts/test-widget-published-branding.mjs",
@@ -57,6 +58,10 @@ if (packageJson.devDependencies["@biomejs/biome"] !== "2.5.6") {
   throw new Error("Web linting must remain on the reviewed Biome version");
 }
 
+if (packageJson.scripts["runtime:test"] !== "node scripts/test-runtime-config.mjs") {
+  throw new Error("Production runtime configuration contract must run in CI");
+}
+
 if (
   packageJson.scripts["widget:test"] !==
   "node scripts/test-widget-loader.mjs && node scripts/test-widget-theme-config.mjs && node scripts/test-widget-published-branding.mjs"
@@ -66,6 +71,38 @@ if (
 
 if (packageJson.scripts["management:test"] !== "node scripts/test-widget-branding-management.mjs") {
   throw new Error("Authenticated widget branding management contract must run in CI");
+}
+
+const runtimeConfig = readFileSync(resolve(root, "lib/runtime-config.ts"), "utf8");
+if (!runtimeConfig.includes('process.env.NODE_ENV === "production"')) {
+  throw new Error("Production API base configuration must fail closed when missing");
+}
+if (!runtimeConfig.includes("process.env.API_BASE_URL")) {
+  throw new Error("Management API origin must come from a server-only runtime variable");
+}
+if (!runtimeConfig.includes('url.protocol !== "https:"')) {
+  throw new Error("Production API base configuration must enforce HTTPS");
+}
+
+const managementProxy = readFileSync(resolve(root, "app/api/management/[...path]/route.ts"), "utf8");
+if (!managementProxy.includes("getServerApiBaseUrl")) {
+  throw new Error("Management proxy must resolve its upstream from server runtime configuration");
+}
+if (managementProxy.includes("NEXT_PUBLIC_API_BASE_URL") || managementProxy.includes("getPublicApiBaseUrl")) {
+  throw new Error("Management proxy must not depend on build-inlined public API configuration");
+}
+
+const runtimeConfigTest = readFileSync(resolve(root, "scripts/test-runtime-config.mjs"), "utf8");
+if (!runtimeConfigTest.includes('process.env.NEXT_PUBLIC_API_BASE_URL = "https://build-placeholder.example.invalid"')) {
+  throw new Error("Runtime config regression must verify that a public build placeholder cannot satisfy server config");
+}
+if (!runtimeConfigTest.includes('resolveApiBase({ nodeEnv: "production", apiBase: undefined })')) {
+  throw new Error("Runtime config regression must verify missing production server config fails closed");
+}
+
+const envExample = readFileSync(resolve(root, ".env.example"), "utf8");
+if (!envExample.includes("API_BASE_URL=http://localhost:8000") || envExample.includes("NEXT_PUBLIC_API_BASE_URL")) {
+  throw new Error("Environment example must document only the server-side API base variable");
 }
 
 const nextConfig = readFileSync(resolve(root, "next.config.mjs"), "utf8");
