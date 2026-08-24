@@ -1,0 +1,51 @@
+services:
+  migrate:
+    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
+    command: ["python", "scripts/production_migrate.py"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+
+  readiness:
+    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
+    command: ["python", "-m", "app.production_readiness"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+
+  api:
+    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    depends_on:
+      readiness:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+
+  web:
+    image: ${WEB_IMAGE:?WEB_IMAGE must be an immutable image reference}
+    environment:
+      API_BASE_URL: ${API_BASE_URL:?API_BASE_URL is required}
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
