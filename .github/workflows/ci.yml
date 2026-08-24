@@ -129,3 +129,40 @@ jobs:
         run: npm run decision:test
       - name: Next.js build
         run: npm run build
+
+  web-container:
+    name: Web production container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production web image
+        run: docker build --file apps/web/Dockerfile --tag maliyet-web-ci apps/web
+      - name: Verify non-root runtime user
+        run: test "$(docker image inspect maliyet-web-ci --format '{{.Config.User}}')" = "10001:10001"
+      - name: Start production web image
+        run: >-
+          docker run --detach --rm --name maliyet-web-ci-run --publish 3000:3000
+          --env API_BASE_URL=https://api.example.invalid maliyet-web-ci
+      - name: Verify application response and security headers
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --dump-header /tmp/web-headers.txt http://127.0.0.1:3000/ >/tmp/web.html; then
+              grep -qi '^x-content-type-options: nosniff' /tmp/web-headers.txt
+              grep -qi '^x-frame-options: DENY' /tmp/web-headers.txt
+              grep -qi '^referrer-policy: no-referrer' /tmp/web-headers.txt
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs maliyet-web-ci-run
+          exit 1
+      - name: Verify immutable widget remains cross-origin consumable
+        run: |
+          curl --fail --silent --show-error --dump-header /tmp/widget-headers.txt \
+            http://127.0.0.1:3000/widget/v1.2.0/loader.js >/tmp/widget-loader.js
+          grep -qi '^access-control-allow-origin: \*$' /tmp/widget-headers.txt
+          grep -qi '^cross-origin-resource-policy: cross-origin' /tmp/widget-headers.txt
+          grep -qi '^cache-control: public, max-age=31536000, immutable' /tmp/widget-headers.txt
+      - name: Stop production web image
+        if: always()
+        run: docker stop maliyet-web-ci-run || true
