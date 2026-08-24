@@ -107,18 +107,34 @@ jobs:
     defaults:
       run:
         working-directory: apps/web
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      API_BASE_URL: "https://api.example.invalid"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - run: npm ci --no-audit --no-fund
-      - run: npm run contract
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run build
+      - name: Verify web contract
+        run: npm run contract
+      - name: Install exact direct dependencies
+        run: npm install --no-audit --no-fund --no-package-lock
+      - name: Biome lint
+        run: npm run lint
+      - name: TypeScript 7 CLI
+        run: npm run typecheck
+      - name: Production runtime configuration contract
+        run: npm run runtime:test
+      - name: Widget SDK integration contract
+        run: npm run widget:test
+      - name: Widget branding management contract
+        run: npm run management:test
+      - name: Calculation workspace contract
+        run: npm run calculation:test
+      - name: Decision analysis workspace contract
+        run: npm run decision:test
+      - name: Next.js build
+        run: npm run build
 
   web-container:
     name: Web production container
@@ -131,30 +147,29 @@ jobs:
         run: test "$(docker image inspect maliyet-web-ci --format '{{.Config.User}}')" = "10001:10001"
       - name: Start production web image
         run: >-
-          docker run --detach --rm --name maliyet-web-ci-run
-          --publish 3000:3000
-          --env API_BASE_URL=https://api.example.invalid
-          maliyet-web-ci
-      - name: Verify SaaS response security headers
+          docker run --detach --rm --name maliyet-web-ci-run --publish 3000:3000
+          --env API_BASE_URL=https://api.example.invalid maliyet-web-ci
+      - name: Verify application response and security headers
         run: |
-          for attempt in $(seq 1 20); do
-            if curl --fail --silent --show-error --dump-header /tmp/web-headers http://127.0.0.1:3000/ >/tmp/web-body; then
-              grep -qi '^X-Content-Type-Options: nosniff' /tmp/web-headers
-              grep -qi '^Referrer-Policy: no-referrer' /tmp/web-headers
-              grep -qi '^X-Frame-Options: DENY' /tmp/web-headers
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --dump-header /tmp/web-headers.txt http://127.0.0.1:3000/ >/tmp/web.html; then
+              grep -qi '^x-content-type-options: nosniff' /tmp/web-headers.txt
+              grep -qi '^x-frame-options: DENY' /tmp/web-headers.txt
+              grep -qi '^referrer-policy: no-referrer' /tmp/web-headers.txt
               exit 0
             fi
             sleep 1
           done
           docker logs maliyet-web-ci-run
           exit 1
-      - name: Verify published Widget SDK headers
+      - name: Verify immutable widget remains cross-origin consumable
         run: |
-          curl --fail --silent --show-error --dump-header /tmp/widget-headers \
+          curl --fail --silent --show-error --dump-header /tmp/widget-headers.txt \
             http://127.0.0.1:3000/widget/v1.2.0/loader.js >/tmp/widget-loader.js
-          tr -d '\r' </tmp/widget-headers >/tmp/widget-headers-normalized
-          grep -q '^Access-Control-Allow-Origin: \*$' /tmp/widget-headers-normalized
-          grep -qi '^Cache-Control: public, max-age=31536000, immutable$' /tmp/widget-headers-normalized
+          tr -d '\r' </tmp/widget-headers.txt >/tmp/widget-headers-lf.txt
+          grep -qi '^access-control-allow-origin: \*$' /tmp/widget-headers-lf.txt
+          grep -qi '^cross-origin-resource-policy: cross-origin' /tmp/widget-headers-lf.txt
+          grep -qi '^cache-control: public, max-age=31536000, immutable' /tmp/widget-headers-lf.txt
       - name: Stop production web image
         if: always()
         run: docker stop maliyet-web-ci-run || true
