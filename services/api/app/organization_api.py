@@ -22,6 +22,7 @@ from app.organization_onboarding import (
     list_organization_access,
 )
 from app.partner_api_management_api import router as partner_api_management_router
+from app.partner_api_public_api import router as partner_api_public_router
 from app.public_projection_api import public_router as public_projection_public_router
 from app.public_projection_api import tenant_router as public_projection_tenant_router
 from app.report_export_api import router as report_export_router
@@ -44,6 +45,7 @@ router.include_router(widget_deployment_discovery_router)
 router.include_router(report_export_router)
 router.include_router(investment_scenario_router)
 router.include_router(partner_api_management_router)
+router.include_router(partner_api_public_router)
 
 
 class OrganizationCreateRequest(BaseModel):
