@@ -29,6 +29,7 @@ jobs:
       - run: python scripts/check_repository_contract.py
       - run: python scripts/check_production_rollout_contract.py
       - run: python scripts/check_release_contract.py
+      - run: python scripts/check_wordpress_plugin_contract.py
       - run: python -m compileall -q scripts services/api/app services/api/tests
 
   api-quality:
