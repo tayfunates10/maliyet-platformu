@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import text
 
+from alembic import command
 from app.database import build_engine
 from app.http_dependencies import validate_database_url
 
