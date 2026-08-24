@@ -10,6 +10,7 @@ from alembic import context
 from app.auth_context import AuthSession
 from app.decision_analysis_models import DecisionAnalysisArtifact
 from app.models import Base
+from app.partner_api_models import PartnerApiCredential
 from app.password_auth import UserCredential
 from app.rules_models import RuleDefinition, RuleSource, RuleVersion
 from app.widget_branding_models import (
@@ -30,6 +31,7 @@ REGISTERED_AUXILIARY_MODELS = (
     AuthSession,
     UserCredential,
     DecisionAnalysisArtifact,
+    PartnerApiCredential,
     WidgetBrandingProfile,
     WidgetPresentationSnapshot,
     WidgetPublishedPresentation,
