@@ -44,7 +44,8 @@ def test_owner_issues_hash_only_token_and_can_revoke(db_session) -> None:
     assert issued.raw_token.startswith("mp_live_")
     assert issued.raw_token not in str(issued.credential.__dict__)
     assert issued.credential.token_sha256 == sha256(issued.raw_token.encode()).hexdigest()
-    assert authenticate_partner_api_token(db_session, raw_token=issued.raw_token).id == issued.credential.id
+    authenticated = authenticate_partner_api_token(db_session, raw_token=issued.raw_token)
+    assert authenticated.id == issued.credential.id
 
     stored = db_session.scalar(
         select(PartnerApiCredential).where(PartnerApiCredential.id == issued.credential.id)
