@@ -7,7 +7,8 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,6 +21,11 @@ from app.partner_api_credentials import (
 )
 
 router = APIRouter(prefix="/partner/v1", tags=["partner-api"])
+partner_bearer = HTTPBearer(
+    auto_error=False,
+    scheme_name="PartnerApiBearer",
+    description="Tenant-scoped Partner API bearer credential.",
+)
 
 
 class PartnerProjectionResponse(BaseModel):
@@ -41,13 +47,10 @@ def _amount_text(value: Decimal) -> str:
     return text or "0"
 
 
-def _raw_partner_token(authorization: str | None) -> str:
-    if authorization is None:
+def _raw_partner_token(credentials: HTTPAuthorizationCredentials | None) -> str:
+    if credentials is None or credentials.scheme.lower() != "bearer" or not credentials.credentials:
         raise _authentication_required()
-    scheme, separator, raw_token = authorization.partition(" ")
-    if separator != " " or scheme != "Bearer" or not raw_token or " " in raw_token:
-        raise _authentication_required()
-    return raw_token
+    return credentials.credentials
 
 
 def _authentication_required() -> HTTPException:
@@ -66,14 +69,17 @@ def get_partner_calculation_projection(
     projection_id: UUID,
     response: Response,
     session: Annotated[Session, Depends(get_database_session)],
-    authorization: Annotated[str | None, Header()] = None,
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Security(partner_bearer),
+    ],
 ) -> PartnerProjectionResponse:
     """Return one active published projection inside the partner credential's tenant."""
 
     try:
         credential = authenticate_partner_api_token(
             session,
-            raw_token=_raw_partner_token(authorization),
+            raw_token=_raw_partner_token(credentials),
         )
     except PartnerApiAuthenticationError as exc:
         raise _authentication_required() from exc
