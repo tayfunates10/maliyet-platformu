@@ -22,7 +22,7 @@ from app.partner_api_credentials import (
 from app.partner_api_models import PartnerApiCredential
 
 router = APIRouter(
-    prefix="/organizations/{organization_id}/partner-api-credentials",
+    prefix="/{organization_id}/partner-api-credentials",
     tags=["partner-api"],
 )
 
