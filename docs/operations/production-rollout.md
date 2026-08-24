@@ -4,20 +4,21 @@ Production rollout must preserve the same fail-closed boundaries used by CI and 
 
 ## Required runtime inputs
 
-- `API_IMAGE_REPOSITORY` + `API_IMAGE_DIGEST`: API registry repository and exact sha256 digest. The compose file structurally builds `repository@sha256:digest`; mutable tags are not part of this contract.
-- `WEB_IMAGE_REPOSITORY` + `WEB_IMAGE_DIGEST`: web registry repository and exact sha256 digest, using the same digest-pinned contract.
+- `API_IMAGE_REPOSITORY` + `API_IMAGE_DIGEST`: API registry repository and exact sha256 digest. The repository value must not contain a mutable tag or embedded digest; the digest must be exactly 64 lowercase hexadecimal characters.
+- `WEB_IMAGE_REPOSITORY` + `WEB_IMAGE_DIGEST`: web registry repository and exact sha256 digest under the same validation contract.
 - `DATABASE_URL`: canonical `postgresql+psycopg` production database URL supplied by the secret/runtime environment. It must never be committed to this repository.
 - `API_BASE_URL`: externally valid HTTPS API origin consumed by the server-side web management proxy.
 - Optional `API_PORT` / `WEB_PORT`: loopback host ports. Public TLS termination/reverse proxying stays outside the application containers.
 
+Before any deployment command, run `python scripts/check_production_rollout_contract.py` in the same environment that provides the image repository/digest values. This validates the actual runtime image inputs, not only the Compose template.
+
 ## Canonical rollout order
 
-1. Run `migrate` exactly once with the release API digest. The existing production migration ceremony obtains the PostgreSQL advisory lock and upgrades to the single repository Alembic head.
-2. Run `readiness` from the same API digest. It is read-only and requires database head == repository head.
-3. Start `api` only after readiness completed successfully.
-4. Start `web` only after the API container is healthy. External traffic must still remain closed until the operator/reverse proxy has verified the application endpoints.
+1. Run migration as a separate explicit ceremony: `docker compose -f compose.production.yml --profile migration run --rm migrate`. The migration service is profile-gated and is deliberately absent from normal application startup.
+2. After migration succeeds, start the application with `docker compose -f compose.production.yml up -d api web`. Compose runs the read-only `readiness` dependency from the same API digest; readiness requires database head == repository head before API can start.
+3. `web` starts only after the API container is healthy. External traffic must remain closed until the operator/reverse proxy has verified the application endpoints.
 
-If migration or readiness fails, the rollout stops. Do not bypass either service by starting API/web manually against an unverified database.
+If migration or readiness fails, the rollout stops. Never bypass the explicit migration ceremony, and never start API/web against an unverified database.
 
 ## Security boundaries
 
@@ -25,4 +26,6 @@ The compose contract does not build images in production, does not embed databas
 
 ## Rollback
 
-Application rollback is safe only when the target older release is schema-compatible with the already-applied database head. Never run an Alembic downgrade automatically during rollback. If a release migration is not backward compatible, recovery requires an explicit reviewed database restoration/migration plan before switching image digests.
+Application rollback without a database restoration is allowed only when the target release has the **exact same Alembic repository head** as the database. The readiness gate intentionally rejects an older image whose repository head differs, even if a migration is believed to be backward-compatible.
+
+Never run an Alembic downgrade automatically during rollback. If the target release has a different Alembic head, recovery requires an explicit reviewed database restoration or forward-fix migration plan before switching image digests. After that plan establishes database head == target repository head, run readiness again before starting API/web.
