@@ -27,6 +27,8 @@ partner_bearer = HTTPBearer(
     description="Tenant-scoped Partner API bearer credential.",
 )
 
+_MAX_PARTNER_PROJECTION_OFFSET = 10_000
+
 
 class PartnerProjectionResponse(BaseModel):
     """Exact customer-safe allowlist exposed to authenticated partner clients."""
@@ -63,11 +65,7 @@ def _amount_text(value: Decimal) -> str:
 
 
 def _raw_partner_token(credentials: HTTPAuthorizationCredentials | None) -> str:
-    if (
-        credentials is None
-        or credentials.scheme.lower() != "bearer"
-        or not credentials.credentials
-    ):
+    if credentials is None or credentials.scheme.lower() != "bearer" or not credentials.credentials:
         raise _authentication_required()
     return credentials.credentials
 
@@ -103,6 +101,13 @@ def _projection_response(projection: PublicCalculationProjection) -> PartnerProj
     )
 
 
+def _bounded_next_offset(*, offset: int, limit: int, has_more: bool) -> int | None:
+    if not has_more:
+        return None
+    candidate = offset + limit
+    return candidate if candidate <= _MAX_PARTNER_PROJECTION_OFFSET else None
+
+
 @router.get(
     "/calculation-projections",
     response_model=PartnerProjectionListResponse,
@@ -115,7 +120,7 @@ def list_partner_calculation_projections(
         Security(partner_bearer),
     ],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
+    offset: Annotated[int, Query(ge=0, le=_MAX_PARTNER_PROJECTION_OFFSET)] = 0,
 ) -> PartnerProjectionListResponse:
     """List active published projections inside the partner credential's tenant."""
 
@@ -146,7 +151,7 @@ def list_partner_calculation_projections(
             )
             for projection in visible
         ],
-        next_offset=offset + limit if has_more else None,
+        next_offset=_bounded_next_offset(offset=offset, limit=limit, has_more=has_more),
     )
 
 
