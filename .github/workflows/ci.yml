@@ -16,12 +16,18 @@ jobs:
   repository-contract:
     name: Repository contract
     runs-on: ubuntu-latest
+    env:
+      API_IMAGE_REPOSITORY: ghcr.io/example/maliyet-api
+      API_IMAGE_DIGEST: "1111111111111111111111111111111111111111111111111111111111111111"
+      WEB_IMAGE_REPOSITORY: ghcr.io/example/maliyet-web
+      WEB_IMAGE_DIGEST: "2222222222222222222222222222222222222222222222222222222222222222"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
       - run: python scripts/check_repository_contract.py
+      - run: python scripts/check_production_rollout_contract.py
       - run: python -m compileall -q scripts services/api/app services/api/tests
 
   api-quality:

@@ -1,0 +1,49 @@
+services:
+  migrate:
+    profiles: ["migration"]
+    image: ${API_IMAGE_REPOSITORY:?API_IMAGE_REPOSITORY is required}@sha256:${API_IMAGE_DIGEST:?API_IMAGE_DIGEST is required}
+    command: ["python", "scripts/production_migrate.py"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+
+  readiness:
+    image: ${API_IMAGE_REPOSITORY:?API_IMAGE_REPOSITORY is required}@sha256:${API_IMAGE_DIGEST:?API_IMAGE_DIGEST is required}
+    command: ["python", "-m", "app.production_readiness"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+
+  api:
+    image: ${API_IMAGE_REPOSITORY:?API_IMAGE_REPOSITORY is required}@sha256:${API_IMAGE_DIGEST:?API_IMAGE_DIGEST is required}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    depends_on:
+      readiness:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+
+  web:
+    image: ${WEB_IMAGE_REPOSITORY:?WEB_IMAGE_REPOSITORY is required}@sha256:${WEB_IMAGE_DIGEST:?WEB_IMAGE_DIGEST is required}
+    environment:
+      API_BASE_URL: ${API_BASE_URL:?API_BASE_URL is required}
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
