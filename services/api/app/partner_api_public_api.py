@@ -14,11 +14,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.http_dependencies import get_database_session
-from app.models import PartnerApiCredential, PublicCalculationProjection
+from app.models import PublicCalculationProjection
 from app.partner_api_credentials import (
     PartnerApiAuthenticationError,
     authenticate_partner_api_token,
 )
+from app.partner_api_models import PartnerApiCredential
 
 router = APIRouter(prefix="/partner/v1", tags=["partner-api"])
 partner_bearer = HTTPBearer(
