@@ -42,7 +42,7 @@ services:
       API_BASE_URL: ${API_BASE_URL:?API_BASE_URL is required}
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     read_only: true
     tmpfs:
