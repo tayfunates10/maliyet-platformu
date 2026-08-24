@@ -4,18 +4,18 @@ Production rollout must preserve the same fail-closed boundaries used by CI and 
 
 ## Required runtime inputs
 
-- `API_IMAGE`: immutable API image reference. Prefer a registry digest such as `registry.example/api@sha256:...`; mutable `latest` tags are forbidden by repository contract.
-- `WEB_IMAGE`: immutable web image reference, likewise pinned to an immutable release artifact.
+- `API_IMAGE_REPOSITORY` + `API_IMAGE_DIGEST`: API registry repository and exact sha256 digest. The compose file structurally builds `repository@sha256:digest`; mutable tags are not part of this contract.
+- `WEB_IMAGE_REPOSITORY` + `WEB_IMAGE_DIGEST`: web registry repository and exact sha256 digest, using the same digest-pinned contract.
 - `DATABASE_URL`: canonical `postgresql+psycopg` production database URL supplied by the secret/runtime environment. It must never be committed to this repository.
 - `API_BASE_URL`: externally valid HTTPS API origin consumed by the server-side web management proxy.
 - Optional `API_PORT` / `WEB_PORT`: loopback host ports. Public TLS termination/reverse proxying stays outside the application containers.
 
 ## Canonical rollout order
 
-1. Run `migrate` exactly once with the release API image. The existing production migration ceremony obtains the PostgreSQL advisory lock and upgrades to the single repository Alembic head.
-2. Run `readiness` from the same API image. It is read-only and requires database head == repository head.
+1. Run `migrate` exactly once with the release API digest. The existing production migration ceremony obtains the PostgreSQL advisory lock and upgrades to the single repository Alembic head.
+2. Run `readiness` from the same API digest. It is read-only and requires database head == repository head.
 3. Start `api` only after readiness completed successfully.
-4. Start `web` only after the API service has started. External traffic must still remain closed until the operator/reverse proxy has verified the application endpoints.
+4. Start `web` only after the API container is healthy. External traffic must still remain closed until the operator/reverse proxy has verified the application endpoints.
 
 If migration or readiness fails, the rollout stops. Do not bypass either service by starting API/web manually against an unverified database.
 
