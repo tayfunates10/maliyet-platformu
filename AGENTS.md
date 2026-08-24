@@ -38,6 +38,7 @@ E-ticaret bir NACE sektörü gibi modellenmez; satış kanalı/operasyon modeli 
 - TaxProfile vergi oranı, parasal eşik veya formül kaynağı değildir; bunlar yalnız versioned rules engine'den gelir.
 - Mevcut TaxProfile `entity_type` değeri kanuni şirket türü taksonomisi olarak yorumlanamaz; yalnız beyan edilmiş uygulama bağlamıdır.
 - TaxProfile yazma yetkisi yalnız authenticated `owner` ve `admin` rollerine aittir.
+- Production migration uygulama startup'ında otomatik çalışmaz; yalnız explicit migration ceremony üzerinden yürütülür ve eşzamanlı actor advisory lock ile fail-closed reddedilir.
 - Bir PR'ın amacı başka bir PR'ın kapsamını gizlice genişletmemelidir.
 - CI kırmızıysa iş tamamlandı olarak raporlanmaz.
 
