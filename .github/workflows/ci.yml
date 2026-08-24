@@ -64,6 +64,32 @@ jobs:
       - name: Pytest
         run: pytest
 
+  api-container:
+    name: API production container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production API image
+        run: docker build --file services/api/Dockerfile --tag maliyet-api-ci services/api
+      - name: Verify non-root runtime user
+        run: test "$(docker image inspect maliyet-api-ci --format '{{.Config.User}}')" = "10001:10001"
+      - name: Start production API image
+        run: docker run --detach --rm --name maliyet-api-ci-run --publish 8000:8000 maliyet-api-ci
+      - name: Verify liveness endpoint
+        run: |
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error http://127.0.0.1:8000/health >/tmp/health.json; then
+              grep -q '"status":"ok"' /tmp/health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs maliyet-api-ci-run
+          exit 1
+      - name: Stop production API image
+        if: always()
+        run: docker stop maliyet-api-ci-run || true
+
   web-quality:
     name: Web quality
     runs-on: ubuntu-latest
