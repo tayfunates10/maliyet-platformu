@@ -1,5 +1,6 @@
 services:
   migrate:
+    profiles: ["migration"]
     image: ${API_IMAGE_REPOSITORY:?API_IMAGE_REPOSITORY is required}@sha256:${API_IMAGE_DIGEST:?API_IMAGE_DIGEST is required}
     command: ["python", "scripts/production_migrate.py"]
     environment:
@@ -14,9 +15,6 @@ services:
     command: ["python", "-m", "app.production_readiness"]
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
     restart: "no"
     read_only: true
     tmpfs:
