@@ -21,6 +21,7 @@ def test_engine_catalog_lists_all_allowlisted_engines() -> None:
         "transportation",
         "accommodation",
         "tourism",
+        "target_profit_pricing",
     }
     assert all(item["execution_requires_trusted_actor"] is True for item in payload)
     assert all(item["regulatory_rules_applied"] is False for item in payload)
@@ -34,6 +35,21 @@ def test_engine_detail_returns_strict_input_schema() -> None:
     assert payload["key"] == "trade"
     assert payload["input_schema"]["type"] == "object"
     assert payload["input_schema"]["additionalProperties"] is False
+
+
+def test_target_profit_detail_requires_decimal_strings() -> None:
+    response = client.get("/engines/target_profit_pricing")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["key"] == "target_profit_pricing"
+    assert payload["engine_version"] == "target-profit-pricing-v2"
+    assert payload["input_schema"]["additionalProperties"] is False
+    properties = payload["input_schema"]["properties"]
+    assert properties["variable_cost_per_unit"]["type"] == "string"
+    assert properties["fixed_costs"]["type"] == "string"
+    assert properties["target_profit"]["type"] == "string"
+    assert properties["expected_units"]["type"] == "string"
 
 
 def test_unknown_engine_returns_404() -> None:
