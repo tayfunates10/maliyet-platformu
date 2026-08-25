@@ -73,10 +73,16 @@ def _payloads() -> dict[str, dict[str, object]]:
                 }
             ],
         },
+        "target_profit_pricing": {
+            "variable_cost_per_unit": "40.00",
+            "fixed_costs": "1000.00",
+            "target_profit": "500.00",
+            "expected_units": "100",
+        },
     }
 
 
-def test_registry_contains_only_supported_sector_engine_keys() -> None:
+def test_registry_contains_only_supported_engine_keys() -> None:
     assert {item.key for item in list_registered_engines()} == {
         "food_manufacturing",
         "textile_manufacturing",
@@ -86,6 +92,7 @@ def test_registry_contains_only_supported_sector_engine_keys() -> None:
         "transportation",
         "accommodation",
         "tourism",
+        "target_profit_pricing",
     }
 
 

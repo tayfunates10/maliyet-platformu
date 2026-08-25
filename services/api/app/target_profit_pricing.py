@@ -9,12 +9,31 @@ financing, demand, or a currency-rounding policy.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import ROUND_HALF_EVEN, Decimal, localcontext
+from decimal import (
+    ROUND_HALF_EVEN,
+    Context,
+    Decimal,
+    DivisionByZero,
+    InvalidOperation,
+    Overflow,
+    localcontext,
+)
 
-ENGINE_VERSION = "target-profit-pricing-v1"
-DECIMAL_PRECISION = 38
-DECIMAL_ROUNDING = ROUND_HALF_EVEN
+ENGINE_VERSION = "target-profit-pricing-v2"
+DECIMAL_PRECISION = 128
+MAX_INPUT_SIGNIFICANT_DIGITS = 38
+MAX_INPUT_SCALE = 18
+MAX_INPUT_INTEGER_DIGITS = 38
 ZERO = Decimal("0")
+ENGINE_CONTEXT = Context(
+    prec=DECIMAL_PRECISION,
+    rounding=ROUND_HALF_EVEN,
+    Emin=-999_999,
+    Emax=999_999,
+    capitals=1,
+    clamp=0,
+    traps=[InvalidOperation, DivisionByZero, Overflow],
+)
 
 
 class TargetProfitPricingInputError(ValueError):
@@ -26,6 +45,24 @@ def _require_decimal(value: object, *, field: str) -> Decimal:
         raise TargetProfitPricingInputError(f"{field} must be Decimal")
     if not value.is_finite():
         raise TargetProfitPricingInputError(f"{field} must be finite")
+
+    decimal_tuple = value.as_tuple()
+    exponent = decimal_tuple.exponent
+    if not isinstance(exponent, int):
+        raise TargetProfitPricingInputError(f"{field} must be finite")
+    significant_digits = len(decimal_tuple.digits)
+    scale = max(-exponent, 0)
+    integer_digits = max(value.copy_abs().adjusted() + 1, 0) if value != ZERO else 0
+    if significant_digits > MAX_INPUT_SIGNIFICANT_DIGITS:
+        raise TargetProfitPricingInputError(
+            f"{field} exceeds {MAX_INPUT_SIGNIFICANT_DIGITS} significant digits"
+        )
+    if scale > MAX_INPUT_SCALE:
+        raise TargetProfitPricingInputError(f"{field} exceeds scale {MAX_INPUT_SCALE}")
+    if integer_digits > MAX_INPUT_INTEGER_DIGITS:
+        raise TargetProfitPricingInputError(
+            f"{field} exceeds {MAX_INPUT_INTEGER_DIGITS} integer digits"
+        )
     return value
 
 
@@ -66,9 +103,10 @@ def calculate_target_profit_price(
         required_revenue = variable_cost_per_unit * expected_units + contribution_total
         required_price_per_unit = required_revenue / expected_units
 
-    Arithmetic runs under an engine-owned Decimal context so caller context
-    changes cannot alter persisted results. No implicit currency rounding is
-    applied.
+    Arithmetic runs under a fully engine-owned Decimal context. Its precision is
+    deliberately wider than the supported 38-digit operands so a 76-digit
+    product can still retain the maximum supported fractional residual. No
+    implicit currency rounding is applied.
     """
 
     variable = _require_non_negative(
@@ -81,9 +119,7 @@ def calculate_target_profit_price(
     if units <= ZERO:
         raise TargetProfitPricingInputError("expected_units must be greater than 0")
 
-    with localcontext() as context:
-        context.prec = DECIMAL_PRECISION
-        context.rounding = DECIMAL_ROUNDING
+    with localcontext(ENGINE_CONTEXT):
         contribution_total = fixed + target
         contribution_per_unit = contribution_total / units
         required_revenue = variable * units + contribution_total
@@ -111,6 +147,11 @@ def build_target_profit_pricing_snapshot(
         "decimal_policy": {
             "precision": DECIMAL_PRECISION,
             "rounding": "ROUND_HALF_EVEN",
+            "emin": ENGINE_CONTEXT.Emin,
+            "emax": ENGINE_CONTEXT.Emax,
+            "max_input_significant_digits": MAX_INPUT_SIGNIFICANT_DIGITS,
+            "max_input_scale": MAX_INPUT_SCALE,
+            "max_input_integer_digits": MAX_INPUT_INTEGER_DIGITS,
             "implicit_currency_rounding": False,
         },
         "variable_cost_per_unit": str(result.variable_cost_per_unit),
