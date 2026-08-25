@@ -230,10 +230,12 @@ def build_tax_reconciliation_snapshot(
         "negative_tax_base_treatment_inferred": False,
     }
     if after_tax is not None:
-        if after_tax.reconciled_taxable_base != reconciliation.reconciled_taxable_base:
-            raise TaxReconciliationInputError(
-                "after_tax result does not belong to reconciliation"
-            )
+        if (
+            after_tax.reconciled_taxable_base != reconciliation.reconciled_taxable_base
+            or after_tax.accounting_profit_before_tax
+            != reconciliation.accounting_profit_before_tax
+        ):
+            raise TaxReconciliationInputError("after_tax result does not belong to reconciliation")
         snapshot["current_tax_expense"] = str(after_tax.current_tax_expense)
         snapshot["accounting_profit_after_current_tax"] = str(
             after_tax.accounting_profit_after_current_tax
