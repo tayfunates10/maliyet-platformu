@@ -62,9 +62,9 @@ def calculate_target_profit_price(
     Formula::
 
         contribution_total = fixed_costs + target_profit
+        contribution_per_unit = contribution_total / expected_units
         required_revenue = variable_cost_per_unit * expected_units + contribution_total
         required_price_per_unit = required_revenue / expected_units
-        contribution_per_unit = required_price_per_unit - variable_cost_per_unit
 
     Arithmetic runs under an engine-owned Decimal context so caller context
     changes cannot alter persisted results. No implicit currency rounding is
@@ -85,9 +85,9 @@ def calculate_target_profit_price(
         context.prec = DECIMAL_PRECISION
         context.rounding = DECIMAL_ROUNDING
         contribution_total = fixed + target
+        contribution_per_unit = contribution_total / units
         required_revenue = variable * units + contribution_total
         required_price = required_revenue / units
-        contribution_per_unit = required_price - variable
 
     return TargetProfitPricingResult(
         variable_cost_per_unit=variable,
