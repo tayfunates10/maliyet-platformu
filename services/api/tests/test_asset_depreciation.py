@@ -96,9 +96,7 @@ def test_supported_precision_preserves_small_residual_on_large_asset() -> None:
     )
 
     assert result.carrying_amount == Decimal("0.01")
-    assert result.accumulated_depreciation == Decimal(
-        "99999999999999999999999999999999999998.99"
-    )
+    assert result.accumulated_depreciation == Decimal("99999999999999999999999999999999999998.99")
 
 
 def test_inputs_beyond_supported_precision_fail_closed() -> None:
