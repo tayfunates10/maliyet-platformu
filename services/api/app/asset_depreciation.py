@@ -98,13 +98,9 @@ def calculate_straight_line_depreciation(
             accumulated = ZERO
             previous_accumulated = ZERO
         else:
-            accumulated = (
-                base if elapsed == life else base * Decimal(elapsed) / Decimal(life)
-            )
+            accumulated = base if elapsed == life else base * Decimal(elapsed) / Decimal(life)
             previous_accumulated = (
-                ZERO
-                if elapsed == 1
-                else base * Decimal(elapsed - 1) / Decimal(life)
+                ZERO if elapsed == 1 else base * Decimal(elapsed - 1) / Decimal(life)
             )
         period_depreciation = accumulated - previous_accumulated
         carrying_amount = cost - accumulated
