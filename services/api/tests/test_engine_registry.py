@@ -79,6 +79,13 @@ def _payloads() -> dict[str, dict[str, object]]:
             "target_profit": "500.00",
             "expected_units": "100",
         },
+        "asset_depreciation": {
+            "asset_key": "machine-1",
+            "acquisition_cost": "120000.00",
+            "residual_value": "12000.00",
+            "useful_life_months": 60,
+            "elapsed_months": 12,
+        },
     }
 
 
@@ -93,6 +100,7 @@ def test_registry_contains_only_supported_engine_keys() -> None:
         "accommodation",
         "tourism",
         "target_profit_pricing",
+        "asset_depreciation",
     }
 
 
