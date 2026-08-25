@@ -96,9 +96,9 @@ def test_supported_maximum_magnitudes_preserve_fractional_fixed_cost() -> None:
         expected_units=maximum,
     )
 
-    variable_total = maximum * maximum
-    assert result.required_revenue == variable_total + Decimal("0.01")
-    assert result.required_revenue - variable_total == Decimal("0.01")
+    assert result.required_revenue == Decimal(
+        "9999999999999999999999999999999999999800000000000000000000000000000000000001.01"
+    )
 
 
 def test_inputs_beyond_supported_precision_fail_closed() -> None:
