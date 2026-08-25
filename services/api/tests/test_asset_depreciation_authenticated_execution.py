@@ -39,7 +39,9 @@ def _tenant_asset_calculation(
 
 
 def _path(organization: Organization, calculation: Calculation) -> str:
-    return f"/organizations/{organization.id}/calculations/{calculation.id}/execute/asset_depreciation"
+    return (
+        f"/organizations/{organization.id}/calculations/{calculation.id}/execute/asset_depreciation"
+    )
 
 
 def _payload() -> dict[str, object]:
