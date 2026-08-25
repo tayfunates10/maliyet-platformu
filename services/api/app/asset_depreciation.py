@@ -9,12 +9,33 @@ separate rule-resolution boundary.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import ROUND_HALF_EVEN, Decimal, localcontext
+from decimal import (
+    ROUND_HALF_EVEN,
+    Context,
+    Decimal,
+    DivisionByZero,
+    InvalidOperation,
+    Overflow,
+    localcontext,
+)
 
 ENGINE_VERSION = "asset-depreciation-v1"
-DECIMAL_PRECISION = 38
+DECIMAL_PRECISION = 76
 DECIMAL_ROUNDING = ROUND_HALF_EVEN
+MAX_INPUT_SIGNIFICANT_DIGITS = 38
+MAX_INPUT_SCALE = 18
+MAX_INPUT_INTEGER_DIGITS = 38
+MAX_USEFUL_LIFE_MONTHS = 1_000_000
 ZERO = Decimal("0")
+ENGINE_CONTEXT = Context(
+    prec=DECIMAL_PRECISION,
+    rounding=DECIMAL_ROUNDING,
+    Emin=-999_999,
+    Emax=999_999,
+    capitals=1,
+    clamp=0,
+    traps=[InvalidOperation, DivisionByZero, Overflow],
+)
 
 
 class AssetDepreciationInputError(ValueError):
@@ -28,6 +49,20 @@ def _require_non_negative_decimal(value: object, *, field: str) -> Decimal:
         raise AssetDepreciationInputError(f"{field} must be finite")
     if value < ZERO:
         raise AssetDepreciationInputError(f"{field} must be non-negative")
+
+    significant_digits = len(value.as_tuple().digits)
+    scale = max(-value.as_tuple().exponent, 0)
+    integer_digits = max(value.adjusted() + 1, 0) if value != ZERO else 0
+    if significant_digits > MAX_INPUT_SIGNIFICANT_DIGITS:
+        raise AssetDepreciationInputError(
+            f"{field} exceeds {MAX_INPUT_SIGNIFICANT_DIGITS} significant digits"
+        )
+    if scale > MAX_INPUT_SCALE:
+        raise AssetDepreciationInputError(f"{field} exceeds scale {MAX_INPUT_SCALE}")
+    if integer_digits > MAX_INPUT_INTEGER_DIGITS:
+        raise AssetDepreciationInputError(
+            f"{field} exceeds {MAX_INPUT_INTEGER_DIGITS} integer digits"
+        )
     return value
 
 
@@ -36,6 +71,10 @@ def _require_positive_int(value: object, *, field: str) -> int:
         raise AssetDepreciationInputError(f"{field} must be int")
     if value <= 0:
         raise AssetDepreciationInputError(f"{field} must be greater than 0")
+    if value > MAX_USEFUL_LIFE_MONTHS:
+        raise AssetDepreciationInputError(
+            f"{field} must be at most {MAX_USEFUL_LIFE_MONTHS}"
+        )
     return value
 
 
@@ -90,9 +129,7 @@ def calculate_straight_line_depreciation(
     if elapsed > life:
         raise AssetDepreciationInputError("elapsed_months cannot exceed useful_life_months")
 
-    with localcontext() as context:
-        context.prec = DECIMAL_PRECISION
-        context.rounding = DECIMAL_ROUNDING
+    with localcontext(ENGINE_CONTEXT):
         base = cost - residual
         if elapsed == 0:
             accumulated = ZERO
@@ -129,7 +166,12 @@ def build_asset_depreciation_snapshot(
         "decimal_policy": {
             "precision": DECIMAL_PRECISION,
             "rounding": "ROUND_HALF_EVEN",
+            "emin": ENGINE_CONTEXT.Emin,
+            "emax": ENGINE_CONTEXT.Emax,
             "implicit_currency_rounding": False,
+            "max_input_significant_digits": MAX_INPUT_SIGNIFICANT_DIGITS,
+            "max_input_scale": MAX_INPUT_SCALE,
+            "max_input_integer_digits": MAX_INPUT_INTEGER_DIGITS,
         },
         "asset_key": result.asset_key,
         "acquisition_cost": str(result.acquisition_cost),
