@@ -161,3 +161,21 @@ def test_snapshot_records_explicit_reconciliation_and_tax_provenance() -> None:
         "rule_key": "corporate-tax",
         "version": "2026-01",
     }
+
+
+def test_snapshot_rejects_after_tax_result_from_different_reconciliation() -> None:
+    first = reconcile_taxable_base(
+        accounting_profit_before_tax=Decimal("100000.00"),
+        adjustments=(TaxBaseAdjustment("add", Decimal("5000.00"), "addition"),),
+    )
+    second = reconcile_taxable_base(
+        accounting_profit_before_tax=Decimal("90000.00"),
+        adjustments=(TaxBaseAdjustment("add", Decimal("15000.00"), "addition"),),
+    )
+    second_after_tax = calculate_after_tax_profit(
+        second,
+        _flat_tax(Decimal("105000.00"), Decimal("21000.00")),
+    )
+
+    with pytest.raises(TaxReconciliationInputError, match="does not belong"):
+        build_tax_reconciliation_snapshot(first, second_after_tax)
