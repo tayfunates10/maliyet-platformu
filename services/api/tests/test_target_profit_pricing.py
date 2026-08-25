@@ -1,6 +1,6 @@
 """Regression tests for deterministic target-profit pricing."""
 
-from decimal import Decimal, getcontext
+from decimal import Decimal, Inexact, getcontext, setcontext
 
 import pytest
 
@@ -57,31 +57,52 @@ def test_runtime_rejects_binary_float_inputs() -> None:
         )
 
 
-def test_repeating_division_is_independent_of_caller_decimal_context() -> None:
-    original_precision = getcontext().prec
+def test_repeating_division_is_independent_of_full_caller_decimal_context() -> None:
+    original_context = getcontext().copy()
     try:
         getcontext().prec = 5
-        low_precision = calculate_target_profit_price(
+        getcontext().Emax = 5
+        getcontext().traps[Inexact] = True
+        constrained = calculate_target_profit_price(
             variable_cost_per_unit=Decimal("1"),
             fixed_costs=Decimal("1"),
             target_profit=Decimal("0"),
             expected_units=Decimal("3"),
         )
 
+        setcontext(original_context.copy())
         getcontext().prec = 50
-        high_precision = calculate_target_profit_price(
+        unconstrained = calculate_target_profit_price(
             variable_cost_per_unit=Decimal("1"),
             fixed_costs=Decimal("1"),
             target_profit=Decimal("0"),
             expected_units=Decimal("3"),
         )
     finally:
-        getcontext().prec = original_precision
+        setcontext(original_context)
 
-    assert low_precision == high_precision
-    assert low_precision.required_contribution_per_unit == Decimal(
-        "0.33333333333333333333333333333333333333"
+    assert constrained == unconstrained
+    assert constrained.required_contribution_per_unit == Decimal(
+        "0.3333333333333333333333333333333333333333333333333333333333333333333333333333"
     )
+
+
+def test_inputs_beyond_supported_precision_fail_closed() -> None:
+    with pytest.raises(TargetProfitPricingInputError, match="significant digits"):
+        calculate_target_profit_price(
+            variable_cost_per_unit=Decimal("123456789012345678901234567890123456789"),
+            fixed_costs=Decimal("0"),
+            target_profit=Decimal("0"),
+            expected_units=Decimal("1"),
+        )
+
+    with pytest.raises(TargetProfitPricingInputError, match="scale 18"):
+        calculate_target_profit_price(
+            variable_cost_per_unit=Decimal("0.0000000000000000001"),
+            fixed_costs=Decimal("0"),
+            target_profit=Decimal("0"),
+            expected_units=Decimal("1"),
+        )
 
 
 def test_snapshot_records_decimal_policy_and_refuses_tax_inference() -> None:
@@ -93,10 +114,15 @@ def test_snapshot_records_decimal_policy_and_refuses_tax_inference() -> None:
     )
     snapshot = build_target_profit_pricing_snapshot(result)
 
-    assert snapshot["engine_version"] == "target-profit-pricing-v1"
+    assert snapshot["engine_version"] == "target-profit-pricing-v2"
     assert snapshot["decimal_policy"] == {
-        "precision": 38,
+        "precision": 76,
         "rounding": "ROUND_HALF_EVEN",
+        "emin": -999999,
+        "emax": 999999,
+        "max_input_significant_digits": 38,
+        "max_input_scale": 18,
+        "max_input_integer_digits": 38,
         "implicit_currency_rounding": False,
     }
     assert snapshot["required_price_per_unit"] == "90.00"
