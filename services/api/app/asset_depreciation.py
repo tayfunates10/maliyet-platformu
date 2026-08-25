@@ -90,27 +90,24 @@ def calculate_straight_line_depreciation(
     if elapsed > life:
         raise AssetDepreciationInputError("elapsed_months cannot exceed useful_life_months")
 
-    base = cost - residual
-    if elapsed == 0:
-        accumulated = ZERO
-        previous_accumulated = ZERO
-    else:
-        with localcontext() as context:
-            context.prec = DECIMAL_PRECISION
-            context.rounding = DECIMAL_ROUNDING
-            if elapsed == life:
-                accumulated = base
-            else:
-                accumulated = base * Decimal(elapsed) / Decimal(life)
-            if elapsed == 1:
-                previous_accumulated = ZERO
-            elif elapsed - 1 == life:
-                previous_accumulated = base
-            else:
-                previous_accumulated = base * Decimal(elapsed - 1) / Decimal(life)
-
-    period_depreciation = accumulated - previous_accumulated
-    carrying_amount = cost - accumulated
+    with localcontext() as context:
+        context.prec = DECIMAL_PRECISION
+        context.rounding = DECIMAL_ROUNDING
+        base = cost - residual
+        if elapsed == 0:
+            accumulated = ZERO
+            previous_accumulated = ZERO
+        else:
+            accumulated = (
+                base if elapsed == life else base * Decimal(elapsed) / Decimal(life)
+            )
+            previous_accumulated = (
+                ZERO
+                if elapsed == 1
+                else base * Decimal(elapsed - 1) / Decimal(life)
+            )
+        period_depreciation = accumulated - previous_accumulated
+        carrying_amount = cost - accumulated
 
     return AssetDepreciationResult(
         asset_key=asset_key,
