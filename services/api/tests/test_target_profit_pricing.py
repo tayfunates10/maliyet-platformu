@@ -83,8 +83,22 @@ def test_repeating_division_is_independent_of_full_caller_decimal_context() -> N
 
     assert constrained == unconstrained
     assert constrained.required_contribution_per_unit == Decimal(
-        "0.3333333333333333333333333333333333333333333333333333333333333333333333333333"
+        "0.33333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333"
     )
+
+
+def test_supported_maximum_magnitudes_preserve_fractional_fixed_cost() -> None:
+    maximum = Decimal("99999999999999999999999999999999999999")
+    result = calculate_target_profit_price(
+        variable_cost_per_unit=maximum,
+        fixed_costs=Decimal("0.01"),
+        target_profit=Decimal("0"),
+        expected_units=maximum,
+    )
+
+    variable_total = maximum * maximum
+    assert result.required_revenue == variable_total + Decimal("0.01")
+    assert result.required_revenue - variable_total == Decimal("0.01")
 
 
 def test_inputs_beyond_supported_precision_fail_closed() -> None:
@@ -116,7 +130,7 @@ def test_snapshot_records_decimal_policy_and_refuses_tax_inference() -> None:
 
     assert snapshot["engine_version"] == "target-profit-pricing-v2"
     assert snapshot["decimal_policy"] == {
-        "precision": 76,
+        "precision": 128,
         "rounding": "ROUND_HALF_EVEN",
         "emin": -999999,
         "emax": 999999,
