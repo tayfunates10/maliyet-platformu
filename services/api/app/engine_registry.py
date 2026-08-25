@@ -22,6 +22,7 @@ from app import (
     basic_metals_manufacturing,
     commerce_engine,
     food_manufacturing,
+    target_profit_pricing,
     textile_manufacturing,
     tourism_engine,
     transportation_engine,
@@ -38,6 +39,7 @@ from app.engine_contracts import (
 )
 from app.manufacturing_engine import RecoveryCredit
 from app.models import CalculationVersion
+from app.target_profit_contracts import TargetProfitPricingInput
 
 
 class EngineNotFoundError(LookupError):
@@ -484,6 +486,21 @@ def _execute_tourism(model: BaseModel) -> dict[str, object]:
     return tourism_engine.build_tourism_snapshot(result)
 
 
+def _execute_target_profit(model: BaseModel) -> dict[str, object]:
+    if not isinstance(model, TargetProfitPricingInput):
+        raise EngineInputValidationError("target-profit engine received the wrong input model")
+    result = target_profit_pricing.calculate_target_profit_price(
+        variable_cost_per_unit=_decimal(
+            model.variable_cost_per_unit,
+            field="variable_cost_per_unit",
+        ),
+        fixed_costs=_decimal(model.fixed_costs, field="fixed_costs"),
+        target_profit=_decimal(model.target_profit, field="target_profit"),
+        expected_units=_decimal(model.expected_units, field="expected_units"),
+    )
+    return target_profit_pricing.build_target_profit_pricing_snapshot(result)
+
+
 _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
     {
         "food_manufacturing": RegisteredEngine(
@@ -541,6 +558,13 @@ _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
             engine_version=tourism_engine.ENGINE_VERSION,
             input_model=TourismEngineInput,
             executor=_execute_tourism,
+        ),
+        "target_profit_pricing": RegisteredEngine(
+            key="target_profit_pricing",
+            title="Hedef kar fiyatlandirma",
+            engine_version=target_profit_pricing.ENGINE_VERSION,
+            input_model=TargetProfitPricingInput,
+            executor=_execute_target_profit,
         ),
     }
 )
