@@ -50,8 +50,12 @@ def _require_non_negative_decimal(value: object, *, field: str) -> Decimal:
     if value < ZERO:
         raise AssetDepreciationInputError(f"{field} must be non-negative")
 
-    significant_digits = len(value.as_tuple().digits)
-    scale = max(-value.as_tuple().exponent, 0)
+    decimal_tuple = value.as_tuple()
+    exponent = decimal_tuple.exponent
+    if not isinstance(exponent, int):
+        raise AssetDepreciationInputError(f"{field} must be finite")
+    significant_digits = len(decimal_tuple.digits)
+    scale = max(-exponent, 0)
     integer_digits = max(value.adjusted() + 1, 0) if value != ZERO else 0
     if significant_digits > MAX_INPUT_SIGNIFICANT_DIGITS:
         raise AssetDepreciationInputError(
