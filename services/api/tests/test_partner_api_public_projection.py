@@ -16,6 +16,7 @@ from app.partner_api_credentials import (
     issue_partner_api_credential,
     revoke_partner_api_credential,
 )
+from app.partner_api_public_api import _bounded_next_offset
 
 _PRIVATE_SENTINEL = "PRIVATE-COST-DO-NOT-LEAK"
 
@@ -93,6 +94,10 @@ def _partner_path(projection_id: str) -> str:
     return f"/organizations/partner/v1/calculation-projections/{projection_id}"
 
 
+def _partner_list_path() -> str:
+    return "/organizations/partner/v1/calculation-projections"
+
+
 def test_partner_token_reads_only_customer_safe_projection(app_db_session: Session) -> None:
     _, organization, calculation, user_token, partner = _tenant(
         app_db_session,
@@ -128,6 +133,84 @@ def test_partner_token_reads_only_customer_safe_projection(app_db_session: Sessi
     assert str(calculation.id) not in serialized
 
 
+def test_partner_projection_discovery_is_bounded_and_tenant_scoped(
+    app_db_session: Session,
+) -> None:
+    _, organization, calculation, user_token, partner = _tenant(
+        app_db_session,
+        suffix="list-own",
+    )
+    _, foreign_org, foreign_calculation, foreign_token, _ = _tenant(
+        app_db_session,
+        suffix="list-foreign",
+    )
+    client = TestClient(app)
+    own = _publish(client, organization, calculation, user_token)
+    foreign = _publish(client, foreign_org, foreign_calculation, foreign_token)
+
+    response = client.get(
+        f"{_partner_list_path()}?limit=1&offset=0",
+        headers={"Authorization": f"Bearer {partner.raw_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    body = response.json()
+    assert body["next_offset"] is None
+    assert len(body["items"]) == 1
+    item = body["items"][0]
+    assert set(item) == {
+        "projection_id",
+        "title",
+        "currency",
+        "estimate_min",
+        "estimate_max",
+        "published_at",
+    }
+    assert item["projection_id"] == own["projection_id"]
+    assert str(foreign["projection_id"]) not in response.text
+    assert str(organization.id) not in response.text
+    assert str(foreign_org.id) not in response.text
+    assert _PRIVATE_SENTINEL not in response.text
+
+    oversized = client.get(
+        f"{_partner_list_path()}?limit=101",
+        headers={"Authorization": f"Bearer {partner.raw_token}"},
+    )
+    assert oversized.status_code == 422
+
+
+def test_partner_projection_discovery_never_emits_unaccepted_offset() -> None:
+    assert _bounded_next_offset(offset=9_900, limit=100, has_more=True) == 10_000
+    assert _bounded_next_offset(offset=10_000, limit=100, has_more=True) is None
+    assert _bounded_next_offset(offset=9_950, limit=50, has_more=False) is None
+
+
+def test_partner_projection_discovery_hides_revoked_projection(
+    app_db_session: Session,
+) -> None:
+    _, organization, calculation, user_token, partner = _tenant(
+        app_db_session,
+        suffix="list-revoked",
+    )
+    client = TestClient(app)
+    published = _publish(client, organization, calculation, user_token)
+    projection_id = str(published["projection_id"])
+    revoke_path = f"/organizations/{organization.id}/public-calculation-projections/{projection_id}"
+    revoked = client.delete(
+        revoke_path,
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert revoked.status_code == 204
+
+    response = client.get(
+        _partner_list_path(),
+        headers={"Authorization": f"Bearer {partner.raw_token}"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "next_offset": None}
+
+
 def test_partner_bearer_scheme_is_case_insensitive(app_db_session: Session) -> None:
     _, organization, calculation, user_token, partner = _tenant(
         app_db_session,
@@ -152,10 +235,12 @@ def test_partner_endpoint_declares_openapi_bearer_security_scheme() -> None:
         "description": "Tenant-scoped Partner API bearer credential.",
         "scheme": "bearer",
     }
-    operation = schema["paths"][
+    detail_operation = schema["paths"][
         "/organizations/partner/v1/calculation-projections/{projection_id}"
     ]["get"]
-    assert {"PartnerApiBearer": []} in operation["security"]
+    list_operation = schema["paths"]["/organizations/partner/v1/calculation-projections"]["get"]
+    assert {"PartnerApiBearer": []} in detail_operation["security"]
+    assert {"PartnerApiBearer": []} in list_operation["security"]
 
 
 def test_partner_projection_access_is_tenant_scoped(app_db_session: Session) -> None:
