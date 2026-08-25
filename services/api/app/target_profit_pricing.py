@@ -20,7 +20,7 @@ from decimal import (
 )
 
 ENGINE_VERSION = "target-profit-pricing-v2"
-DECIMAL_PRECISION = 76
+DECIMAL_PRECISION = 128
 MAX_INPUT_SIGNIFICANT_DIGITS = 38
 MAX_INPUT_SCALE = 18
 MAX_INPUT_INTEGER_DIGITS = 38
@@ -103,8 +103,10 @@ def calculate_target_profit_price(
         required_revenue = variable_cost_per_unit * expected_units + contribution_total
         required_price_per_unit = required_revenue / expected_units
 
-    Arithmetic runs under a fully engine-owned Decimal context. No implicit
-    currency rounding is applied.
+    Arithmetic runs under a fully engine-owned Decimal context. Its precision is
+    deliberately wider than the supported 38-digit operands so a 76-digit
+    product can still retain the maximum supported fractional residual. No
+    implicit currency rounding is applied.
     """
 
     variable = _require_non_negative(
