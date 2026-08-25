@@ -72,9 +72,7 @@ def _require_positive_int(value: object, *, field: str) -> int:
     if value <= 0:
         raise AssetDepreciationInputError(f"{field} must be greater than 0")
     if value > MAX_USEFUL_LIFE_MONTHS:
-        raise AssetDepreciationInputError(
-            f"{field} must be at most {MAX_USEFUL_LIFE_MONTHS}"
-        )
+        raise AssetDepreciationInputError(f"{field} must be at most {MAX_USEFUL_LIFE_MONTHS}")
     return value
 
 
