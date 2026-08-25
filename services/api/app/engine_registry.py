@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app import (
     accommodation_engine,
+    asset_depreciation,
     basic_metals_manufacturing,
     commerce_engine,
     food_manufacturing,
@@ -27,6 +28,7 @@ from app import (
     tourism_engine,
     transportation_engine,
 )
+from app.asset_depreciation_contracts import AssetDepreciationInput
 from app.calculation_orchestration import record_calculation_version
 from app.engine_contracts import (
     AccommodationEngineInput,
@@ -501,6 +503,19 @@ def _execute_target_profit(model: BaseModel) -> dict[str, object]:
     return target_profit_pricing.build_target_profit_pricing_snapshot(result)
 
 
+def _execute_asset_depreciation(model: BaseModel) -> dict[str, object]:
+    if not isinstance(model, AssetDepreciationInput):
+        raise EngineInputValidationError("asset-depreciation engine received the wrong input model")
+    result = asset_depreciation.calculate_straight_line_depreciation(
+        asset_key=model.asset_key,
+        acquisition_cost=_decimal(model.acquisition_cost, field="acquisition_cost"),
+        residual_value=_decimal(model.residual_value, field="residual_value"),
+        useful_life_months=model.useful_life_months,
+        elapsed_months=model.elapsed_months,
+    )
+    return asset_depreciation.build_asset_depreciation_snapshot(result)
+
+
 _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
     {
         "food_manufacturing": RegisteredEngine(
@@ -565,6 +580,13 @@ _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
             engine_version=target_profit_pricing.ENGINE_VERSION,
             input_model=TargetProfitPricingInput,
             executor=_execute_target_profit,
+        ),
+        "asset_depreciation": RegisteredEngine(
+            key="asset_depreciation",
+            title="Varlik amortismani",
+            engine_version=asset_depreciation.ENGINE_VERSION,
+            input_model=AssetDepreciationInput,
+            executor=_execute_asset_depreciation,
         ),
     }
 )
