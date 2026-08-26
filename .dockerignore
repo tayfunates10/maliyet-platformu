@@ -1,0 +1,8 @@
+*
+!services/
+!services/api/
+!services/api/**
+!data/
+!data/tr/
+!data/tr/2026/
+!data/tr/2026/**
