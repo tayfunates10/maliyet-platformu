@@ -84,11 +84,14 @@ def test_authenticated_personnel_cost_resolves_rules_and_persists_provenance(
     assert version.ruleset_snapshot["regulatory_rules_applied"] is True
     assert version.ruleset_snapshot["current_rules_resolved"] is True
     assert version.ruleset_snapshot["effective_at"] == "2026-08-19"
-    rule_codes = {
-        item["code"]
-        for item in version.ruleset_snapshot["rule_versions"]
-        if isinstance(item, dict)
-    }
+    rule_versions = version.ruleset_snapshot["rule_versions"]
+    assert isinstance(rule_versions, list)
+    rule_codes: set[str] = set()
+    for item in rule_versions:
+        assert isinstance(item, dict)
+        code = item.get("code")
+        assert isinstance(code, str)
+        rule_codes.add(code)
     assert rule_codes == {
         "TR.SGK.4A.PRIVATE.PEK_LIMITS",
         "TR.SGK.4A.GENERAL.PREMIUM_RATES",
