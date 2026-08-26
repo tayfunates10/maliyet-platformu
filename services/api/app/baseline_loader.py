@@ -94,6 +94,13 @@ def read_manifest(path: Path = DEFAULT_MANIFEST_PATH) -> BaselineManifest:
     return BaselineManifest.model_validate_json(path.read_text(encoding="utf-8"))
 
 
+def _validated_manifest(path: Path) -> BaselineManifest:
+    manifest = read_manifest(path)
+    if manifest.dataset != "TR-2026-core-baseline" or manifest.dataset_version != 1:
+        raise BaselineIntegrityError("unsupported baseline dataset identity")
+    return manifest
+
+
 def verify_source_capture(spec: SourceSpec) -> Path:
     """Verify the exact curated evidence capture declared by a source entry."""
 
@@ -217,10 +224,7 @@ def load_tr_2026_baseline(
 ) -> BaselineLoadResult:
     """Load the reviewed baseline idempotently; any drift fails closed."""
 
-    manifest = read_manifest(path)
-    if manifest.dataset != "TR-2026-core-baseline" or manifest.dataset_version != 1:
-        raise BaselineIntegrityError("unsupported baseline dataset identity")
-
+    manifest = _validated_manifest(path)
     sources_by_key: dict[str, RuleSource] = {}
     for source_spec in manifest.sources:
         if source_spec.key in sources_by_key:
@@ -244,6 +248,106 @@ def load_tr_2026_baseline(
                 source=source,
                 spec=version_spec,
             )
+            version_count += 1
+
+    return BaselineLoadResult(
+        sources=len(sources_by_key),
+        definitions=definition_count,
+        versions=version_count,
+    )
+
+
+def verify_tr_2026_baseline_state(
+    session: Session,
+    path: Path = DEFAULT_MANIFEST_PATH,
+) -> BaselineLoadResult:
+    """Read-only verification that persisted rules exactly match the curated baseline."""
+
+    manifest = _validated_manifest(path)
+    sources_by_key: dict[str, RuleSource] = {}
+    for source_spec in manifest.sources:
+        verify_source_capture(source_spec)
+        matches = session.scalars(
+            select(RuleSource).where(RuleSource.canonical_url == source_spec.canonical_url)
+        ).all()
+        if len(matches) != 1 or matches[0].content_sha256 != source_spec.content_sha256:
+            raise BaselineIntegrityError(f"persisted source drift for {source_spec.key}")
+        source = matches[0]
+        expected_source = (
+            source_spec.authority,
+            source_spec.source_type,
+            source_spec.title,
+            source_spec.official_reference,
+            source_spec.published_on,
+            source_spec.retrieved_at,
+        )
+        actual_source = (
+            source.authority,
+            source.source_type,
+            source.title,
+            source.official_reference,
+            source.published_on,
+            source.retrieved_at,
+        )
+        if actual_source != expected_source:
+            raise BaselineIntegrityError(f"persisted source metadata drift for {source_spec.key}")
+        sources_by_key[source_spec.key] = source
+
+    definition_count = 0
+    version_count = 0
+    for rule_spec in manifest.rules:
+        definitions = session.scalars(
+            select(RuleDefinition).where(
+                RuleDefinition.jurisdiction == "TR",
+                RuleDefinition.code == rule_spec.code,
+            )
+        ).all()
+        if len(definitions) != 1:
+            raise BaselineIntegrityError(f"persisted rule definition missing for {rule_spec.code}")
+        definition = definitions[0]
+        expected_definition = (rule_spec.category, rule_spec.description, rule_spec.value_kind)
+        actual_definition = (definition.category, definition.description, definition.value_kind)
+        if actual_definition != expected_definition:
+            raise BaselineIntegrityError(f"persisted rule definition drift for {rule_spec.code}")
+        definition_count += 1
+
+        for version_spec in rule_spec.versions:
+            source = sources_by_key.get(version_spec.source_key)
+            if source is None:
+                raise BaselineIntegrityError(
+                    f"unknown source key {version_spec.source_key} for {rule_spec.code}"
+                )
+            versions = session.scalars(
+                select(RuleVersion).where(
+                    RuleVersion.rule_definition_id == definition.id,
+                    RuleVersion.revision == version_spec.revision,
+                )
+            ).all()
+            if len(versions) != 1:
+                raise BaselineIntegrityError(
+                    f"persisted rule version missing for {rule_spec.code} revision {version_spec.revision}"
+                )
+            version = versions[0]
+            expected_version = (
+                source.id,
+                version_spec.effective_from,
+                version_spec.effective_to,
+                version_spec.applicability,
+                version_spec.payload,
+                rule_payload_sha256(version_spec.payload),
+            )
+            actual_version = (
+                version.source_id,
+                version.effective_from,
+                version.effective_to,
+                version.applicability,
+                version.payload,
+                version.payload_sha256,
+            )
+            if actual_version != expected_version:
+                raise BaselineIntegrityError(
+                    f"persisted rule version drift for {rule_spec.code} revision {version_spec.revision}"
+                )
             version_count += 1
 
     return BaselineLoadResult(
