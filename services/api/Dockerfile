@@ -7,11 +7,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-COPY alembic.ini ./
-COPY alembic ./alembic
-COPY app ./app
-COPY scripts ./scripts
+COPY services/api/pyproject.toml ./
+COPY services/api/alembic.ini ./
+COPY services/api/alembic ./alembic
+COPY services/api/app ./app
+COPY services/api/scripts ./scripts
+COPY data ./data
 
 RUN python -m pip install . \
     && chown -R 10001:10001 /app
