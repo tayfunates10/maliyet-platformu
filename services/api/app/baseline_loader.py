@@ -324,7 +324,9 @@ def verify_tr_2026_baseline_state(
         ).all()
         expected_revisions = {version_spec.revision for version_spec in rule_spec.versions}
         persisted_revisions = {version.revision for version in persisted_versions}
-        if persisted_revisions != expected_revisions or len(persisted_versions) != len(expected_revisions):
+        revisions_drifted = persisted_revisions != expected_revisions
+        duplicate_revisions = len(persisted_versions) != len(expected_revisions)
+        if revisions_drifted or duplicate_revisions:
             raise BaselineIntegrityError(
                 f"persisted rule revision set drift for {rule_spec.code}"
             )
