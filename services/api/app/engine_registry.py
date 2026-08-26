@@ -9,7 +9,16 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from datetime import date
+from decimal import (
+    ROUND_HALF_EVEN,
+    Context,
+    Decimal,
+    DivisionByZero,
+    InvalidOperation,
+    Overflow,
+    localcontext,
+)
 from types import MappingProxyType
 from typing import cast
 from uuid import UUID
@@ -21,8 +30,10 @@ from app import (
     accommodation_engine,
     asset_depreciation,
     basic_metals_manufacturing,
+    calculation_kernel,
     commerce_engine,
     food_manufacturing,
+    personnel_cost,
     target_profit_pricing,
     tax_reconciliation,
     textile_manufacturing,
@@ -42,6 +53,8 @@ from app.engine_contracts import (
 )
 from app.manufacturing_engine import RecoveryCredit
 from app.models import CalculationVersion
+from app.personnel_cost_contracts import PersonnelCostInput
+from app.rules_engine import RuleConfigurationError, RuleNotFound, resolve_rule
 from app.target_profit_contracts import TargetProfitPricingInput
 from app.tax_reconciliation_contracts import TaxReconciliationInput
 
@@ -78,6 +91,10 @@ class RegisteredExecution:
 
 
 Executor = Callable[[BaseModel], dict[str, object]]
+RegulatedExecutor = Callable[
+    [Session, BaseModel],
+    tuple[dict[str, object], dict[str, object]],
+]
 
 
 @dataclass(frozen=True)
@@ -86,7 +103,26 @@ class RegisteredEngine:
     title: str
     engine_version: str
     input_model: type[BaseModel]
-    executor: Executor
+    executor: Executor | None = None
+    regulated_executor: RegulatedExecutor | None = None
+    regulatory_rules_applied: bool = False
+
+    def __post_init__(self) -> None:
+        if (self.executor is None) == (self.regulated_executor is None):
+            raise RuntimeError("registered engine must have exactly one executor")
+        if self.regulated_executor is not None and not self.regulatory_rules_applied:
+            raise RuntimeError("regulated executor must declare regulatory rules")
+
+
+PERSONNEL_EXECUTION_CONTEXT = Context(
+    prec=76,
+    rounding=ROUND_HALF_EVEN,
+    Emin=-999_999,
+    Emax=999_999,
+    capitals=1,
+    clamp=0,
+    traps=[InvalidOperation, DivisionByZero, Overflow],
+)
 
 
 def _decimal(value: str, *, field: str) -> Decimal:
@@ -538,6 +574,76 @@ def _execute_tax_reconciliation(model: BaseModel) -> dict[str, object]:
     return tax_reconciliation.build_tax_reconciliation_snapshot(reconciliation)
 
 
+def _execute_personnel_cost(
+    session: Session,
+    model: BaseModel,
+) -> tuple[dict[str, object], dict[str, object]]:
+    if not isinstance(model, PersonnelCostInput):
+        raise EngineInputValidationError("personnel-cost engine received the wrong input model")
+    try:
+        effective_at = date.fromisoformat(model.at_date)
+    except ValueError as exc:
+        raise EngineInputValidationError("at_date must be an ISO calendar date") from exc
+
+    try:
+        limits_rule = resolve_rule(
+            session,
+            code="TR.SGK.4A.PRIVATE.PEK_LIMITS",
+            at_date=effective_at,
+        )
+        rates_rule = resolve_rule(
+            session,
+            code="TR.SGK.4A.GENERAL.PREMIUM_RATES",
+            at_date=effective_at,
+        )
+        with localcontext(PERSONNEL_EXECUTION_CONTEXT):
+            sgk_result = calculation_kernel.calculate_sgk_4a_full_month_premiums(
+                _decimal(
+                    model.declared_monthly_earnings,
+                    field="declared_monthly_earnings",
+                ),
+                limits_rule,
+                rates_rule,
+            )
+            result = personnel_cost.calculate_personnel_cost(
+                gross_cash_compensation=_decimal(
+                    model.gross_cash_compensation,
+                    field="gross_cash_compensation",
+                ),
+                sgk_premium=sgk_result,
+                additional_employer_costs=tuple(
+                    personnel_cost.EmployerCostLine(
+                        key=item.key,
+                        amount=_decimal(
+                            item.amount,
+                            field=f"additional_employer_cost[{item.key}].amount",
+                        ),
+                    )
+                    for item in model.additional_employer_costs
+                ),
+            )
+    except (
+        RuleNotFound,
+        RuleConfigurationError,
+        calculation_kernel.CalculationInputError,
+        calculation_kernel.CalculationRulePayloadError,
+        personnel_cost.PersonnelCostInputError,
+        ArithmeticError,
+    ) as exc:
+        raise EngineInputValidationError("required SGK rules cannot be applied safely") from exc
+
+    ruleset_snapshot: dict[str, object] = {
+        "effective_at": effective_at.isoformat(),
+        "rule_versions": [
+            dict(sgk_result.limits_rule_snapshot),
+            dict(sgk_result.rates_rule_snapshot),
+        ],
+        "regulatory_rules_applied": True,
+        "current_rules_resolved": True,
+    }
+    return personnel_cost.build_personnel_cost_snapshot(result), ruleset_snapshot
+
+
 _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
     {
         "food_manufacturing": RegisteredEngine(
@@ -617,6 +723,14 @@ _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
             input_model=TaxReconciliationInput,
             executor=_execute_tax_reconciliation,
         ),
+        "personnel_cost": RegisteredEngine(
+            key="personnel_cost",
+            title="Personel gercek maliyeti",
+            engine_version=personnel_cost.ENGINE_VERSION,
+            input_model=PersonnelCostInput,
+            regulated_executor=_execute_personnel_cost,
+            regulatory_rules_applied=True,
+        ),
     }
 )
 
@@ -640,6 +754,7 @@ def describe_registered_engine(engine_key: str) -> EngineDescriptor:
         title=engine.title,
         engine_version=engine.engine_version,
         input_schema=schema,
+        regulatory_rules_applied=engine.regulatory_rules_applied,
     )
 
 
@@ -654,9 +769,11 @@ def execute_registered_engine(
     engine_key: str,
     payload: dict[str, object],
 ) -> RegisteredExecution:
-    """Validate and execute one allowlisted engine without persistence."""
+    """Validate and execute one non-regulatory allowlisted engine without persistence."""
 
     engine = get_registered_engine(engine_key)
+    if engine.executor is None:
+        raise EngineInputValidationError("engine requires trusted rule resolution")
     try:
         model = engine.input_model.model_validate(payload)
         output_snapshot = engine.executor(model)
@@ -692,7 +809,28 @@ def execute_and_record_registered_engine(
 ) -> tuple[CalculationVersion, RegisteredExecution]:
     """Execute then persist through the trusted tenant orchestration layer."""
 
-    execution = execute_registered_engine(engine_key=engine_key, payload=payload)
+    engine = get_registered_engine(engine_key)
+    if engine.regulated_executor is None:
+        execution = execute_registered_engine(engine_key=engine_key, payload=payload)
+    else:
+        try:
+            model = engine.input_model.model_validate(payload)
+            output_snapshot, ruleset_snapshot = engine.regulated_executor(session, model)
+        except ValidationError as exc:
+            raise EngineInputValidationError(str(exc)) from exc
+        except EngineInputValidationError:
+            raise
+        except ValueError as exc:
+            raise EngineInputValidationError(str(exc)) from exc
+        input_snapshot = cast(dict[str, object], model.model_dump(mode="json"))
+        execution = RegisteredExecution(
+            engine_key=engine.key,
+            engine_version=engine.engine_version,
+            input_snapshot=input_snapshot,
+            ruleset_snapshot=ruleset_snapshot,
+            output_snapshot=output_snapshot,
+        )
+
     version = record_calculation_version(
         session,
         organization_id=organization_id,

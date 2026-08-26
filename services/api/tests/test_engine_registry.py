@@ -109,10 +109,11 @@ def test_registry_contains_only_supported_engine_keys() -> None:
         "target_profit_pricing",
         "asset_depreciation",
         "tax_reconciliation",
+        "personnel_cost",
     }
 
 
-def test_every_registered_engine_executes_its_domain_adapter() -> None:
+def test_every_non_regulatory_engine_executes_its_domain_adapter() -> None:
     for engine_key, payload in _payloads().items():
         execution = execute_registered_engine(engine_key=engine_key, payload=payload)
 
@@ -123,6 +124,22 @@ def test_every_registered_engine_executes_its_domain_adapter() -> None:
             "regulatory_rules_applied": False,
             "current_rules_resolved": False,
         }
+
+
+def test_personnel_cost_requires_trusted_rule_resolution() -> None:
+    descriptor = describe_registered_engine("personnel_cost")
+    assert descriptor.regulatory_rules_applied is True
+
+    with pytest.raises(EngineInputValidationError, match="trusted rule resolution"):
+        execute_registered_engine(
+            engine_key="personnel_cost",
+            payload={
+                "at_date": "2026-08-19",
+                "gross_cash_compensation": "50000.00",
+                "declared_monthly_earnings": "50000.00",
+                "additional_employer_costs": [],
+            },
+        )
 
 
 def test_tax_reconciliation_does_not_infer_current_tax() -> None:
