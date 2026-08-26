@@ -117,6 +117,28 @@ def verify_source_capture(spec: SourceSpec) -> Path:
     return capture_path
 
 
+def _source_metadata_from_spec(spec: SourceSpec) -> tuple[object, ...]:
+    return (
+        spec.authority,
+        spec.source_type,
+        spec.title,
+        spec.official_reference,
+        spec.published_on,
+        spec.retrieved_at,
+    )
+
+
+def _source_metadata_from_model(source: RuleSource) -> tuple[object, ...]:
+    return (
+        source.authority,
+        source.source_type,
+        source.title,
+        source.official_reference,
+        source.published_on,
+        source.retrieved_at,
+    )
+
+
 def _get_or_create_source(session: Session, spec: SourceSpec) -> RuleSource:
     verify_source_capture(spec)
     existing = session.scalar(
@@ -126,6 +148,8 @@ def _get_or_create_source(session: Session, spec: SourceSpec) -> RuleSource:
         )
     )
     if existing is not None:
+        if _source_metadata_from_model(existing) != _source_metadata_from_spec(spec):
+            raise BaselineIntegrityError(f"source metadata drift for {spec.key}")
         return existing
     source = RuleSource(
         authority=spec.authority,
@@ -273,23 +297,7 @@ def verify_tr_2026_baseline_state(
         if len(matches) != 1 or matches[0].content_sha256 != source_spec.content_sha256:
             raise BaselineIntegrityError(f"persisted source drift for {source_spec.key}")
         persisted_source = matches[0]
-        expected_source = (
-            source_spec.authority,
-            source_spec.source_type,
-            source_spec.title,
-            source_spec.official_reference,
-            source_spec.published_on,
-            source_spec.retrieved_at,
-        )
-        actual_source = (
-            persisted_source.authority,
-            persisted_source.source_type,
-            persisted_source.title,
-            persisted_source.official_reference,
-            persisted_source.published_on,
-            persisted_source.retrieved_at,
-        )
-        if actual_source != expected_source:
+        if _source_metadata_from_model(persisted_source) != _source_metadata_from_spec(source_spec):
             raise BaselineIntegrityError(f"persisted source metadata drift for {source_spec.key}")
         sources_by_key[source_spec.key] = persisted_source
 
@@ -311,24 +319,24 @@ def verify_tr_2026_baseline_state(
             raise BaselineIntegrityError(f"persisted rule definition drift for {rule_spec.code}")
         definition_count += 1
 
+        persisted_versions = session.scalars(
+            select(RuleVersion).where(RuleVersion.rule_definition_id == definition.id)
+        ).all()
+        expected_revisions = {version_spec.revision for version_spec in rule_spec.versions}
+        persisted_revisions = {version.revision for version in persisted_versions}
+        if persisted_revisions != expected_revisions or len(persisted_versions) != len(expected_revisions):
+            raise BaselineIntegrityError(
+                f"persisted rule revision set drift for {rule_spec.code}"
+            )
+        versions_by_revision = {version.revision: version for version in persisted_versions}
+
         for version_spec in rule_spec.versions:
             version_source = sources_by_key.get(version_spec.source_key)
             if version_source is None:
                 raise BaselineIntegrityError(
                     f"unknown source key {version_spec.source_key} for {rule_spec.code}"
                 )
-            versions = session.scalars(
-                select(RuleVersion).where(
-                    RuleVersion.rule_definition_id == definition.id,
-                    RuleVersion.revision == version_spec.revision,
-                )
-            ).all()
-            if len(versions) != 1:
-                raise BaselineIntegrityError(
-                    "persisted rule version missing for "
-                    f"{rule_spec.code} revision {version_spec.revision}"
-                )
-            version = versions[0]
+            version = versions_by_revision[version_spec.revision]
             expected_version = (
                 version_source.id,
                 version_spec.effective_from,
