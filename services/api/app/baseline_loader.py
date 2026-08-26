@@ -312,8 +312,8 @@ def verify_tr_2026_baseline_state(
         definition_count += 1
 
         for version_spec in rule_spec.versions:
-            persisted_source = sources_by_key.get(version_spec.source_key)
-            if persisted_source is None:
+            version_source = sources_by_key.get(version_spec.source_key)
+            if version_source is None:
                 raise BaselineIntegrityError(
                     f"unknown source key {version_spec.source_key} for {rule_spec.code}"
                 )
@@ -330,7 +330,7 @@ def verify_tr_2026_baseline_state(
                 )
             version = versions[0]
             expected_version = (
-                persisted_source.id,
+                version_source.id,
                 version_spec.effective_from,
                 version_spec.effective_to,
                 version_spec.applicability,
