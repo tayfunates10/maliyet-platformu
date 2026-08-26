@@ -325,7 +325,8 @@ def verify_tr_2026_baseline_state(
             ).all()
             if len(versions) != 1:
                 raise BaselineIntegrityError(
-                    f"persisted rule version missing for {rule_spec.code} revision {version_spec.revision}"
+                    "persisted rule version missing for "
+                    f"{rule_spec.code} revision {version_spec.revision}"
                 )
             version = versions[0]
             expected_version = (
@@ -346,7 +347,8 @@ def verify_tr_2026_baseline_state(
             )
             if actual_version != expected_version:
                 raise BaselineIntegrityError(
-                    f"persisted rule version drift for {rule_spec.code} revision {version_spec.revision}"
+                    "persisted rule version drift for "
+                    f"{rule_spec.code} revision {version_spec.revision}"
                 )
             version_count += 1
 
