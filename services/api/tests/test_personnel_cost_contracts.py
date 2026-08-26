@@ -41,3 +41,16 @@ def test_personnel_cost_contract_rejects_numeric_money_and_rate_override() -> No
                 "employer_sgk_rate": "0.01",
             }
         )
+
+
+def test_personnel_cost_contract_rejects_unbounded_decimal_forms() -> None:
+    for invalid in ("1e1000000", "9" * 39, "0." + "1" * 19):
+        with pytest.raises(ValidationError):
+            PersonnelCostInput.model_validate(
+                {
+                    "at_date": "2026-08-19",
+                    "gross_cash_compensation": invalid,
+                    "declared_monthly_earnings": "50000.00",
+                    "additional_employer_costs": [],
+                }
+            )
