@@ -272,7 +272,7 @@ def verify_tr_2026_baseline_state(
         ).all()
         if len(matches) != 1 or matches[0].content_sha256 != source_spec.content_sha256:
             raise BaselineIntegrityError(f"persisted source drift for {source_spec.key}")
-        source = matches[0]
+        persisted_source = matches[0]
         expected_source = (
             source_spec.authority,
             source_spec.source_type,
@@ -282,16 +282,16 @@ def verify_tr_2026_baseline_state(
             source_spec.retrieved_at,
         )
         actual_source = (
-            source.authority,
-            source.source_type,
-            source.title,
-            source.official_reference,
-            source.published_on,
-            source.retrieved_at,
+            persisted_source.authority,
+            persisted_source.source_type,
+            persisted_source.title,
+            persisted_source.official_reference,
+            persisted_source.published_on,
+            persisted_source.retrieved_at,
         )
         if actual_source != expected_source:
             raise BaselineIntegrityError(f"persisted source metadata drift for {source_spec.key}")
-        sources_by_key[source_spec.key] = source
+        sources_by_key[source_spec.key] = persisted_source
 
     definition_count = 0
     version_count = 0
@@ -312,8 +312,8 @@ def verify_tr_2026_baseline_state(
         definition_count += 1
 
         for version_spec in rule_spec.versions:
-            source = sources_by_key.get(version_spec.source_key)
-            if source is None:
+            persisted_source = sources_by_key.get(version_spec.source_key)
+            if persisted_source is None:
                 raise BaselineIntegrityError(
                     f"unknown source key {version_spec.source_key} for {rule_spec.code}"
                 )
@@ -330,7 +330,7 @@ def verify_tr_2026_baseline_state(
                 )
             version = versions[0]
             expected_version = (
-                source.id,
+                persisted_source.id,
                 version_spec.effective_from,
                 version_spec.effective_to,
                 version_spec.applicability,
