@@ -24,6 +24,7 @@ from app import (
     commerce_engine,
     food_manufacturing,
     target_profit_pricing,
+    tax_reconciliation,
     textile_manufacturing,
     tourism_engine,
     transportation_engine,
@@ -42,6 +43,7 @@ from app.engine_contracts import (
 from app.manufacturing_engine import RecoveryCredit
 from app.models import CalculationVersion
 from app.target_profit_contracts import TargetProfitPricingInput
+from app.tax_reconciliation_contracts import TaxReconciliationInput
 
 
 class EngineNotFoundError(LookupError):
@@ -516,6 +518,26 @@ def _execute_asset_depreciation(model: BaseModel) -> dict[str, object]:
     return asset_depreciation.build_asset_depreciation_snapshot(result)
 
 
+def _execute_tax_reconciliation(model: BaseModel) -> dict[str, object]:
+    if not isinstance(model, TaxReconciliationInput):
+        raise EngineInputValidationError("tax-reconciliation engine received the wrong input model")
+    reconciliation = tax_reconciliation.reconcile_taxable_base(
+        accounting_profit_before_tax=_decimal(
+            model.accounting_profit_before_tax,
+            field="accounting_profit_before_tax",
+        ),
+        adjustments=tuple(
+            tax_reconciliation.TaxBaseAdjustment(
+                key=item.key,
+                amount=_decimal(item.amount, field=f"adjustment[{item.key}].amount"),
+                treatment=item.treatment,
+            )
+            for item in model.adjustments
+        ),
+    )
+    return tax_reconciliation.build_tax_reconciliation_snapshot(reconciliation)
+
+
 _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
     {
         "food_manufacturing": RegisteredEngine(
@@ -587,6 +609,13 @@ _ENGINE_REGISTRY: Mapping[str, RegisteredEngine] = MappingProxyType(
             engine_version=asset_depreciation.ENGINE_VERSION,
             input_model=AssetDepreciationInput,
             executor=_execute_asset_depreciation,
+        ),
+        "tax_reconciliation": RegisteredEngine(
+            key="tax_reconciliation",
+            title="Vergi matrahi mutabakati",
+            engine_version=tax_reconciliation.ENGINE_VERSION,
+            input_model=TaxReconciliationInput,
+            executor=_execute_tax_reconciliation,
         ),
     }
 )
