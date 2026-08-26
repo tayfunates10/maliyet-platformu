@@ -72,8 +72,8 @@ def test_authenticated_personnel_cost_resolves_rules_and_persists_provenance(
     body = CalculationExecutionResponse.model_validate(response.json())
     assert body.engine_key == "personnel_cost"
     assert body.engine_version == "personnel-cost-v1"
-    assert body.output_snapshot["employer_sgk_premium"] == "11875.0000"
-    assert body.output_snapshot["total_employer_cost"] == "62875.0000"
+    assert body.output_snapshot["employer_sgk_premium"] == "11875.000000"
+    assert body.output_snapshot["total_employer_cost"] == "62875.000000"
     assert body.output_snapshot["employee_income_tax_inferred"] is False
 
     version = app_db_session.scalar(
