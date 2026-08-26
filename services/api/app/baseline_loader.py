@@ -15,7 +15,18 @@ from sqlalchemy.orm import Session
 from app.rules_engine import create_rule_version, rule_payload_sha256, validate_rule_payload
 from app.rules_models import RuleDefinition, RuleSource, RuleVersion
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+
+def _discover_repo_root() -> Path:
+    """Locate the immutable regulatory dataset in source checkouts and production images."""
+
+    module_path = Path(__file__).resolve()
+    for candidate in module_path.parents:
+        if (candidate / "data/tr/2026/baseline.json").is_file():
+            return candidate
+    raise RuntimeError("TR-2026 regulatory baseline is not packaged with the application")
+
+
+REPO_ROOT = _discover_repo_root()
 DEFAULT_MANIFEST_PATH = REPO_ROOT / "data/tr/2026/baseline.json"
 
 
