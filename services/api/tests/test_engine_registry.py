@@ -86,6 +86,13 @@ def _payloads() -> dict[str, dict[str, object]]:
             "useful_life_months": 60,
             "elapsed_months": 12,
         },
+        "tax_reconciliation": {
+            "accounting_profit_before_tax": "100000.00",
+            "adjustments": [
+                {"key": "non_deductible", "amount": "5000.00", "treatment": "addition"},
+                {"key": "exemption", "amount": "2000.00", "treatment": "deduction"},
+            ],
+        },
     }
 
 
@@ -101,6 +108,7 @@ def test_registry_contains_only_supported_engine_keys() -> None:
         "tourism",
         "target_profit_pricing",
         "asset_depreciation",
+        "tax_reconciliation",
     }
 
 
@@ -115,6 +123,18 @@ def test_every_registered_engine_executes_its_domain_adapter() -> None:
             "regulatory_rules_applied": False,
             "current_rules_resolved": False,
         }
+
+
+def test_tax_reconciliation_does_not_infer_current_tax() -> None:
+    execution = execute_registered_engine(
+        engine_key="tax_reconciliation",
+        payload=_payloads()["tax_reconciliation"],
+    )
+
+    assert execution.output_snapshot["reconciled_taxable_base"] == "103000.00"
+    assert execution.output_snapshot["taxable_base_inferred_from_accounting_profit"] is False
+    assert "current_tax_expense" not in execution.output_snapshot
+    assert execution.ruleset_snapshot["regulatory_rules_applied"] is False
 
 
 def test_trade_and_ecommerce_are_distinct_keys_on_the_same_core_version() -> None:
