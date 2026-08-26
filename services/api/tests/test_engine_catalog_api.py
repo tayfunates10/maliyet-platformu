@@ -23,6 +23,7 @@ def test_engine_catalog_lists_all_allowlisted_engines() -> None:
         "tourism",
         "target_profit_pricing",
         "asset_depreciation",
+        "tax_reconciliation",
     }
     assert all(item["execution_requires_trusted_actor"] is True for item in payload)
     assert all(item["regulatory_rules_applied"] is False for item in payload)
@@ -66,6 +67,21 @@ def test_asset_depreciation_detail_keeps_money_as_strings() -> None:
     assert properties["residual_value"]["type"] == "string"
     assert properties["useful_life_months"]["type"] == "integer"
     assert properties["elapsed_months"]["type"] == "integer"
+
+
+def test_tax_reconciliation_detail_keeps_money_as_strings() -> None:
+    response = client.get("/engines/tax_reconciliation")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["key"] == "tax_reconciliation"
+    assert payload["engine_version"] == "tax-reconciliation-v1"
+    assert payload["input_schema"]["additionalProperties"] is False
+    properties = payload["input_schema"]["properties"]
+    assert properties["accounting_profit_before_tax"]["type"] == "string"
+    adjustment_schema = payload["input_schema"]["$defs"]["TaxBaseAdjustmentInput"]
+    assert adjustment_schema["additionalProperties"] is False
+    assert adjustment_schema["properties"]["amount"]["type"] == "string"
 
 
 def test_unknown_engine_returns_404() -> None:
