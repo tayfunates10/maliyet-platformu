@@ -39,7 +39,8 @@ def _tenant_calculation(
 
 
 def _path(organization: Organization, calculation: Calculation) -> str:
-    return f"/organizations/{organization.id}/calculations/{calculation.id}/execute/tax_reconciliation"
+    base = f"/organizations/{organization.id}/calculations/{calculation.id}"
+    return f"{base}/execute/tax_reconciliation"
 
 
 def _payload() -> dict[str, object]:
