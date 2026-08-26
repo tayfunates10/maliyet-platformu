@@ -21,4 +21,4 @@ class TaxReconciliationInput(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     accounting_profit_before_tax: str
-    adjustments: tuple[TaxBaseAdjustmentInput, ...] = Field(default=(), max_length=500)
+    adjustments: list[TaxBaseAdjustmentInput] = Field(default_factory=list, max_length=500)
