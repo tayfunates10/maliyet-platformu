@@ -38,9 +38,11 @@ def run_production_baseline_ceremony(database_url: str) -> BaselineLoadResult:
                 raise RuntimeError("another regulatory baseline ceremony is active")
 
             try:
-                with Session(bind=connection, expire_on_commit=False) as session:
-                    with session.begin():
-                        result = load_tr_2026_baseline(session)
+                with (
+                    Session(bind=connection, expire_on_commit=False) as session,
+                    session.begin(),
+                ):
+                    result = load_tr_2026_baseline(session)
             finally:
                 connection.execute(
                     text("SELECT pg_advisory_unlock(:lock_key)"),
