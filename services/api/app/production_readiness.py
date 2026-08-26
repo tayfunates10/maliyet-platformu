@@ -1,4 +1,4 @@
-"""Fail-closed production readiness probe for database connectivity and schema parity."""
+"""Fail-closed production readiness for schema and regulatory baseline parity."""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ from collections.abc import Sequence
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
+from app.baseline_loader import verify_tr_2026_baseline_state
 from app.database import build_engine
 from app.http_dependencies import validate_database_url
 from app.production_migrations import _alembic_config
@@ -24,13 +26,8 @@ def _require_single_head(heads: Sequence[str], *, source: str) -> str:
     return heads[0]
 
 
-def check_production_readiness(database_url: str) -> str:
-    """Verify PostgreSQL connectivity and exact repository/database Alembic head parity.
-
-    This probe is intentionally read-only. It never runs migrations and never treats
-    process liveness as database readiness. Deploy automation must run the explicit
-    production migration ceremony first, then use this probe before routing traffic.
-    """
+def check_production_schema_readiness(database_url: str) -> str:
+    """Verify PostgreSQL connectivity and exact repository/database Alembic head parity."""
 
     validated_url = validate_database_url(database_url)
     config = _alembic_config(validated_url)
@@ -56,6 +53,27 @@ def check_production_readiness(database_url: str) -> str:
     return repository_head
 
 
+def check_production_readiness(database_url: str) -> str:
+    """Verify schema parity plus exact curated TR-2026 regulatory baseline state.
+
+    This probe is read-only. It never runs migrations, loads rules, repairs drift or
+    treats process liveness as database readiness. Deployment must run the explicit
+    migration and regulatory-baseline ceremonies before this traffic gate.
+    """
+
+    validated_url = validate_database_url(database_url)
+    repository_head = check_production_schema_readiness(validated_url)
+    engine = build_engine(validated_url)
+    try:
+        with engine.connect() as connection:
+            with Session(bind=connection, expire_on_commit=False) as session:
+                verify_tr_2026_baseline_state(session)
+            connection.rollback()
+    finally:
+        engine.dispose()
+    return repository_head
+
+
 def main() -> int:
     """Run the readiness probe as a secret-safe deployment command."""
 
@@ -63,7 +81,7 @@ def main() -> int:
     if database_url is None:
         raise RuntimeError(f"{_DATABASE_URL_ENV} is required for production readiness")
     head = check_production_readiness(database_url)
-    print(f"production readiness: ok ({head})")
+    print(f"production readiness: ok ({head}; TR-2026 baseline verified)")
     return 0
 
 
