@@ -350,7 +350,7 @@ def login(
             email=payload.email,
             password=payload.password,
         )
-    except (PasswordAuthenticationError, ValueError):
+    except PasswordAuthenticationError, ValueError:
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"detail": "invalid credentials"},
