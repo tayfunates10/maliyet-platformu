@@ -39,7 +39,7 @@ jobs:
         id: api
         uses: docker/build-push-action@v6
         with:
-          context: services/api
+          context: .
           file: services/api/Dockerfile
           push: true
           tags: ${{ env.API_IMAGE }}:sha-${{ github.sha }}

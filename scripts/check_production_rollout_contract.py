@@ -53,10 +53,11 @@ def validate_runtime_image_inputs() -> None:
 def main() -> None:
     text = COMPOSE.read_text(encoding="utf-8")
 
-    for service in ("migrate", "readiness", "api", "web"):
+    for service in ("migrate", "baseline", "readiness", "api", "web"):
         require(text, f"  {service}:\n")
 
     require(text, 'profiles: ["migration"]')
+    require(text, 'profiles: ["baseline"]')
     require(text, "${API_IMAGE_REPOSITORY:?API_IMAGE_REPOSITORY is required}@sha256:")
     require(text, "${API_IMAGE_DIGEST:?API_IMAGE_DIGEST is required}")
     require(text, "${WEB_IMAGE_REPOSITORY:?WEB_IMAGE_REPOSITORY is required}@sha256:")
@@ -64,6 +65,7 @@ def main() -> None:
     require(text, "${DATABASE_URL:?DATABASE_URL is required}")
     require(text, "${API_BASE_URL:?API_BASE_URL is required}")
     require(text, 'command: ["python", "scripts/production_migrate.py"]')
+    require(text, 'command: ["python", "scripts/production_baseline.py"]')
     require(text, 'command: ["python", "-m", "app.production_readiness"]')
     require(text, "condition: service_completed_successfully")
     require(text, "condition: service_healthy")
@@ -81,18 +83,22 @@ def main() -> None:
     ):
         forbid(text, forbidden)
 
-    migrate_section, remaining = text.split("  readiness:\n", maxsplit=1)
+    migrate_section, remaining = text.split("  baseline:\n", maxsplit=1)
+    baseline_section, remaining = remaining.split("  readiness:\n", maxsplit=1)
     readiness_section, remaining = remaining.split("  api:\n", maxsplit=1)
     api_section, _web_section = remaining.split("  web:\n", maxsplit=1)
     forbid(migrate_section, "depends_on:")
+    forbid(baseline_section, "depends_on:")
     forbid(readiness_section, "migrate:")
+    forbid(readiness_section, "baseline:")
     require(api_section, "readiness:")
 
     migrate_index = text.index("  migrate:\n")
+    baseline_index = text.index("  baseline:\n")
     readiness_index = text.index("  readiness:\n")
     api_index = text.index("  api:\n")
     web_index = text.index("  web:\n")
-    if not migrate_index < readiness_index < api_index < web_index:
+    if not migrate_index < baseline_index < readiness_index < api_index < web_index:
         raise SystemExit("Production rollout services are not in canonical rollout order")
 
     validate_runtime_image_inputs()

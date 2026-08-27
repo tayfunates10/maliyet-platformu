@@ -74,6 +74,10 @@ jobs:
         run: pytest
       - name: Production migration ceremony
         run: python scripts/production_migrate.py
+      - name: Production regulatory baseline ceremony
+        run: python scripts/production_baseline.py
+      - name: Production readiness after baseline
+        run: python -m app.production_readiness
 
   api-container:
     name: API production container
@@ -81,11 +85,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build production API image
-        run: docker build --file services/api/Dockerfile --tag maliyet-api-ci services/api
+        run: docker build --file services/api/Dockerfile --tag maliyet-api-ci .
       - name: Verify non-root runtime user
         run: test "$(docker image inspect maliyet-api-ci --format '{{.Config.User}}')" = "10001:10001"
-      - name: Verify migration CLI is packaged
-        run: docker run --rm --entrypoint python maliyet-api-ci -m py_compile scripts/production_migrate.py
+      - name: Verify deployment CLIs and baseline evidence are packaged
+        run: |
+          docker run --rm --entrypoint python maliyet-api-ci -m py_compile scripts/production_migrate.py scripts/production_baseline.py
+          docker run --rm --entrypoint python maliyet-api-ci -c "from app.baseline_loader import read_manifest, verify_source_capture; manifest=read_manifest(); [verify_source_capture(source) for source in manifest.sources]; print(manifest.dataset)"
       - name: Start production API image
         run: docker run --detach --rm --name maliyet-api-ci-run --publish 8000:8000 maliyet-api-ci
       - name: Verify liveness endpoint

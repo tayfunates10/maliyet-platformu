@@ -26,6 +26,7 @@ def main() -> None:
         "id-token: write",
         "attestations: write",
         "docker/build-push-action@v6",
+        "context: .\n          file: services/api/Dockerfile",
         "push: true",
         "provenance: mode=max",
         "sbom: true",

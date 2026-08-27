@@ -12,8 +12,9 @@ from app.baseline_loader import (
     load_tr_2026_baseline,
     read_manifest,
     verify_source_capture,
+    verify_tr_2026_baseline_state,
 )
-from app.rules_engine import RuleNotFound, resolve_rule
+from app.rules_engine import RuleNotFound, resolve_rule, rule_payload_sha256
 from app.rules_models import RuleDefinition, RuleSource, RuleVersion
 
 
@@ -29,6 +30,58 @@ def test_baseline_load_is_idempotent_and_complete(db_session: Session) -> None:
     assert db_session.scalar(select(func.count()).select_from(RuleSource)) == 6
     assert db_session.scalar(select(func.count()).select_from(RuleDefinition)) == 11
     assert db_session.scalar(select(func.count()).select_from(RuleVersion)) == 11
+
+
+def test_baseline_load_rejects_existing_source_metadata_drift(db_session: Session) -> None:
+    load_tr_2026_baseline(db_session)
+    source = db_session.scalar(select(RuleSource).order_by(RuleSource.created_at).limit(1))
+    assert source is not None
+    source.title = f"{source.title} tampered"
+    db_session.flush()
+
+    with pytest.raises(BaselineIntegrityError, match="source metadata drift"):
+        load_tr_2026_baseline(db_session)
+
+
+def test_read_only_baseline_verifier_accepts_exact_persisted_state(db_session: Session) -> None:
+    loaded = load_tr_2026_baseline(db_session)
+
+    assert verify_tr_2026_baseline_state(db_session) == loaded
+
+
+def test_read_only_baseline_verifier_rejects_persisted_payload_drift(
+    db_session: Session,
+) -> None:
+    load_tr_2026_baseline(db_session)
+    version = db_session.scalar(select(RuleVersion).order_by(RuleVersion.created_at).limit(1))
+    assert version is not None
+    version.payload = {"tampered": True}
+    db_session.flush()
+
+    with pytest.raises(BaselineIntegrityError, match="persisted rule version drift"):
+        verify_tr_2026_baseline_state(db_session)
+
+
+def test_read_only_baseline_verifier_rejects_unlisted_revision(db_session: Session) -> None:
+    load_tr_2026_baseline(db_session)
+    version = db_session.scalar(select(RuleVersion).order_by(RuleVersion.created_at).limit(1))
+    assert version is not None
+    db_session.add(
+        RuleVersion(
+            rule_definition_id=version.rule_definition_id,
+            source_id=version.source_id,
+            revision=version.revision + 1000,
+            effective_from=version.effective_from,
+            effective_to=version.effective_to,
+            applicability=version.applicability,
+            payload=version.payload,
+            payload_sha256=rule_payload_sha256(version.payload),
+        )
+    )
+    db_session.flush()
+
+    with pytest.raises(BaselineIntegrityError, match="persisted rule revision set drift"):
+        verify_tr_2026_baseline_state(db_session)
 
 
 def test_all_declared_source_capture_hashes_verify() -> None:

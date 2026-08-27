@@ -7,7 +7,8 @@ import os
 import pytest
 from sqlalchemy import Engine, text
 
-from app.production_readiness import check_production_readiness
+from app.production_baseline import run_production_baseline_ceremony
+from app.production_readiness import check_production_readiness, check_production_schema_readiness
 
 
 def _test_database_url() -> str:
@@ -17,14 +18,30 @@ def _test_database_url() -> str:
     return value
 
 
-def test_production_readiness_accepts_database_at_repository_head(db_engine: Engine) -> None:
-    expected_head = check_production_readiness(_test_database_url())
+def test_schema_readiness_accepts_database_at_repository_head(db_engine: Engine) -> None:
+    expected_head = check_production_schema_readiness(_test_database_url())
 
     with db_engine.connect() as connection:
         current_head = connection.execute(
             text("SELECT version_num FROM alembic_version")
         ).scalar_one()
 
+    assert current_head == expected_head
+
+
+def test_production_baseline_ceremony_makes_full_readiness_pass(db_engine: Engine) -> None:
+    first = run_production_baseline_ceremony(_test_database_url())
+    second = run_production_baseline_ceremony(_test_database_url())
+    expected_head = check_production_readiness(_test_database_url())
+
+    assert first == second
+    assert first.sources == 6
+    assert first.definitions == 11
+    assert first.versions == 11
+    with db_engine.connect() as connection:
+        current_head = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
     assert current_head == expected_head
 
 
