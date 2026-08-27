@@ -159,7 +159,7 @@ def verify_password(password: str, encoded_hash: str) -> bool:
         ):
             return False
         actual = _derive(password, salt=salt, n=n, r=r, p=p, dklen=dklen)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return False
     return hmac.compare_digest(actual, expected)
 
