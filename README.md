@@ -4,12 +4,12 @@ Türkiye'deki işletmeler için sektör bazlı maliyet, kârlılık, sermaye ve 
 
 ## Ürün kapsamı
 
-İlk sürüm sekiz faaliyet alanını destekleyecek:
+İlk sürüm sekiz faaliyet alanını destekler:
 
 - İmalat: gıda ürünleri, tekstil ürünleri, ana metal.
 - Hizmet/ticaret: e-ticaret, ticaret, ulaştırma, konaklama, turizm.
 
-Platform tek bir hesaplama çekirdeğini SaaS web uygulaması, gömülebilir widget, API, WordPress entegrasyonu ve ileride white-label dağıtım kanalları üzerinden sunacaktır.
+Platform aynı güvenli hesaplama ve provenance sınırlarını SaaS web uygulaması, gömülebilir widget, Partner API ve WordPress entegrasyonu üzerinden sunar. White-label dağıtım ilk sürüm sonrası genişleme alanıdır.
 
 ## Temel mühendislik ilkeleri
 
@@ -23,14 +23,15 @@ Platform tek bir hesaplama çekirdeğini SaaS web uygulaması, gömülebilir wid
 
 ```text
 .
-├── services/api/          # FastAPI tabanlı hesaplama/API servisi
-├── docs/                  # Mimari, ürün kapsamı ve ADR kayıtları
-├── scripts/               # Repository kalite kontrolleri
-├── .github/workflows/     # CI kalite kapıları
+├── apps/web/              # Next.js SaaS web uygulaması ve immutable Widget SDK
+├── services/api/          # FastAPI hesaplama, tenant, rapor ve partner API servisi
+├── data/tr/2026/          # Kaynak-hash doğrulamalı TR-2026 mevzuat baseline'ı
+├── integrations/          # WordPress entegrasyonu
+├── docs/                  # Mimari, ürün kapsamı ve operasyon sözleşmeleri
+├── scripts/               # Repository ve production kalite kontrolleri
+├── .github/workflows/     # CI ve provenance'lı production release
 └── AGENTS.md              # İnsan ve AI geliştiriciler için devralma sözleşmesi
 ```
-
-Web uygulaması ayrı bir stacked PR ile `apps/web` altında eklenecektir.
 
 ## Yerel geliştirme
 
@@ -47,10 +48,11 @@ mypy app
 pytest
 ```
 
-Repository yapısal sözleşmesini doğrulamak için:
+Repository ve ilk sürüm sözleşmelerini doğrulamak için repository kökünde:
 
 ```bash
 python scripts/check_repository_contract.py
+python scripts/check_first_release_scope.py
 ```
 
 ## Pull request politikası
@@ -59,4 +61,8 @@ PR'lar küçük, tek amaçlı ve bağımsız incelenebilir olmalıdır. Her PR a
 
 ## Durum
 
-Foundation geliştirmesi devam ediyor. Bu repository henüz production kullanıma hazır değildir.
+Kanonik ilk sürüm kapsamı: **TAMAM**.
+
+Repository; sekiz sektör motoru, ortak finansal karar yetenekleri, rule-resolved personel/mevzuat sınırları, immutable calculation provenance, tenant izolasyonu, SaaS web, Widget SDK, Partner API, WordPress, CSV/XLSX/DOCX/PDF raporları, production container'ları, migration + regulatory-baseline + readiness rollout zinciri ve provenance/SBOM üretimli release workflow'unu içerir.
+
+Bu durum kod ve repository kapsamının tamamlandığını ifade eder; canlı production yayını ayrıca gerçek registry digest'leri, production `DATABASE_URL`, `API_BASE_URL`, TLS/reverse proxy ve operatör rollout ceremony'si gerektirir. Bu dış ortam girdileri repository içine gömülmez veya CI'da sahte production kanıtı olarak kullanılmaz.
