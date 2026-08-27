@@ -27,6 +27,7 @@ jobs:
         with:
           python-version: "3.14"
       - run: python scripts/check_repository_contract.py
+      - run: python scripts/check_first_release_scope.py
       - run: python scripts/check_production_rollout_contract.py
       - run: python scripts/check_release_contract.py
       - run: python scripts/check_wordpress_plugin_contract.py
