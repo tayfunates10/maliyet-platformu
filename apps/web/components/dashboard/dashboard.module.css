@@ -152,6 +152,9 @@
 }
 
 .header {
+  /* Grid and flex items default to a min-content floor; without this the long
+     heading would stop the whole column from shrinking on narrow viewports. */
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -159,8 +162,13 @@
   gap: 1rem;
 }
 
+.headerTitles {
+  min-width: 0;
+}
+
 .headerTitles h1 {
   margin: 0;
+  overflow-wrap: anywhere;
   font-size: clamp(1.5rem, 2.4vw, 2rem);
   line-height: 1.15;
   letter-spacing: -0.03em;
@@ -213,6 +221,7 @@
 }
 
 .scopeBar {
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: end;
@@ -235,6 +244,11 @@
 }
 
 .scopeField select {
+  /* A select sizes to its longest option unless it is pinned to its container,
+     which would otherwise widen the page on a narrow viewport. */
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 0.6rem;
@@ -256,12 +270,14 @@
 /* Grid ------------------------------------------------------------------ */
 
 .metricRow {
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 
 .mainGrid {
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 1.05fr) minmax(0, 0.8fr);
   gap: 1rem;
@@ -815,11 +831,17 @@
     z-index: 20;
     width: min(17rem, 84vw);
     transform: translateX(-100%);
-    transition: transform 180ms ease;
+    /* Hidden rather than merely off-canvas: this keeps the closed drawer out of
+       the tab order and out of the document's scrollable width. */
+    visibility: hidden;
+    transition:
+      transform 180ms ease,
+      visibility 180ms ease;
   }
 
   .sidebarOpen {
     transform: translateX(0);
+    visibility: visible;
     box-shadow: 0 0 0 100vmax rgb(11 21 51 / 45%);
   }
 

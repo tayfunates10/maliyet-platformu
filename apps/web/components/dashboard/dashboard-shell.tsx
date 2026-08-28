@@ -23,6 +23,8 @@ import { WidgetPreviewCard } from "./widget-preview-card";
 
 type LoadState = "idle" | "loading" | "loaded" | "error";
 
+const NO_CALCULATION_TEXT = "Henüz yeterli veri yok";
+
 function friendlyError(error: unknown): string {
   if (error instanceof Error) {
     if (error.message === "authentication_required") return "Oturum doğrulanamadı.";
@@ -260,12 +262,52 @@ export function DashboardShell() {
         ) : null}
 
         <section className={styles.metricRow} aria-label="Temel göstergeler">
-          {loading || selected === null ? (
+          {loading ? (
             ["toplam", "birim", "marj", "mevzuat"].map((slot) => (
               <div key={`metric-skeleton-${slot}`} className={styles.metricCard}>
                 <PanelSkeleton lines={2} />
               </div>
             ))
+          ) : selected === null ? (
+            // Loaded, but this tenant has no recorded calculation yet: say so
+            // rather than leaving a skeleton spinning over absent data.
+            <>
+              <MetricCard label="Toplam Maliyet" formatted={null} emptyText={NO_CALCULATION_TEXT} />
+              <MetricCard label="Birim Maliyet" formatted={null} emptyText={NO_CALCULATION_TEXT} />
+              <MetricCard label="Katkı Marjı" formatted={null} emptyText={NO_CALCULATION_TEXT} />
+              <MetricCard
+                label="Mevzuat Baseline"
+                formatted={
+                  baseline === null
+                    ? null
+                    : `${formatInteger(baseline.effective_rule_count) ?? "0"} / ${
+                        formatInteger(baseline.rule_count) ?? "0"
+                      }`
+                }
+                support="Yürürlükteki kural / toplam kural"
+                emptyText="Baseline doğrulanamadı"
+                badge={
+                  baseline === null ? null : (
+                    <StatusPill
+                      tone={
+                        baseline.status === "ready"
+                          ? "ok"
+                          : baseline.status === "degraded"
+                            ? "warn"
+                            : "fail"
+                      }
+                      label={
+                        baseline.status === "ready"
+                          ? "Doğrulandı"
+                          : baseline.status === "degraded"
+                            ? "Uyarı"
+                            : "Hata"
+                      }
+                    />
+                  )
+                }
+              />
+            </>
           ) : (
             <>
               <MetricCard

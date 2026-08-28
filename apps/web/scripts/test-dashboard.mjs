@@ -184,6 +184,24 @@ assert.match(trend, /aria-label=/);
 assert.match(trend, /gözlenen değer aralığıdır/);
 assert.match(trend, /usable\.length < 2/);
 
+// --- Responsive floors ----------------------------------------------------
+
+const dashboardCss = read("components/dashboard/dashboard.module.css");
+// Grid and flex items must not keep a min-content floor, and a select must not
+// size to its longest option: both widen the page on a narrow viewport.
+assert.match(dashboardCss, /\.scopeField select \{[^}]*width: 100%/);
+assert.match(dashboardCss, /\.scopeField select \{[^}]*min-width: 0/);
+for (const block of ["header", "headerTitles", "scopeBar", "metricRow", "mainGrid"]) {
+  assert.match(
+    dashboardCss,
+    new RegExp(`\\.${block} \\{[^}]*min-width: 0`),
+    `.${block} must not keep a min-content width floor`,
+  );
+}
+// The closed mobile drawer stays out of the tab order and out of scroll width.
+assert.match(dashboardCss, /visibility: hidden/);
+assert.match(dashboardCss, /prefers-reduced-motion/);
+
 // --- Navigation -----------------------------------------------------------
 
 // Routes that do not exist render disabled rather than as dead links.
