@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth_context import AuthenticatedIdentity
+from app.dashboard_api import router as dashboard_router
 from app.http_dependencies import get_authenticated_identity, get_database_session
 from app.investment_scenario_api import router as investment_scenario_router
 from app.organization_onboarding import (
@@ -34,6 +35,7 @@ from app.widget_branding_api import profile_router as widget_branding_profile_ro
 from app.widget_deployment_discovery_api import router as widget_deployment_discovery_router
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
+router.include_router(dashboard_router)
 router.include_router(tax_profile_router)
 router.include_router(public_projection_tenant_router)
 router.include_router(public_projection_public_router)
