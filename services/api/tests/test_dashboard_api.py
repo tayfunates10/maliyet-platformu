@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 
 from fastapi.testclient import TestClient
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.auth_context import issue_session
@@ -17,6 +18,7 @@ from app.dashboard_overview import (
 from app.engine_registry import list_registered_engines
 from app.main import app
 from app.models import Calculation, CalculationVersion, Organization, OrganizationMembership, User
+from app.rules_models import RuleDefinition, RuleSource, RuleVersion
 
 
 def _tenant(
@@ -200,9 +202,17 @@ def test_dashboard_timeline_is_chronological(app_db_session: Session) -> None:
     assert body["calculations"][0]["unit_cost"] == "61.50"
 
 
-def test_regulatory_baseline_fails_closed_when_not_loaded(db_session: Session) -> None:
+def test_regulatory_baseline_fails_closed_when_rules_are_missing(db_session: Session) -> None:
+    # Remove the persisted rule base inside this transaction so the state is
+    # deterministic regardless of what other suites left in the database.
+    db_session.execute(delete(RuleVersion))
+    db_session.execute(delete(RuleDefinition))
+    db_session.execute(delete(RuleSource))
+    db_session.flush()
+
     overview = regulatory_baseline_overview(db_session, at_date=date(2026, 6, 1))
-    # Nothing was loaded into this transaction, so a clean bill of health is impossible.
+
+    # Without a verified rule base a clean bill of health is impossible.
     assert overview.status != "ready"
     assert overview.issues
     assert overview.effective_rule_count == 0
@@ -255,7 +265,7 @@ def test_dashboard_overview_never_sums_across_engines(app_db_session: Session) -
         organization=organization,
         name="Ulastirma",
         engine_key="transportation",
-        output_snapshot={"route_cost": "250.00"},
+        output_snapshot={"total_trip_cost": "250.00"},
     )
 
     overview = build_dashboard_overview(
@@ -276,3 +286,84 @@ def test_headline_field_declarations_cover_every_registered_engine() -> None:
     declared = set(ENGINE_HEADLINE_FIELDS)
     assert registered <= declared, f"undeclared engines: {sorted(registered - declared)}"
     assert declared <= registered, f"stale declarations: {sorted(declared - registered)}"
+
+
+def test_revenue_maps_never_enter_the_cost_breakdown(app_db_session: Session) -> None:
+    user, organization, token = _tenant(app_db_session, suffix="revenue")
+    _recorded_calculation(
+        app_db_session,
+        user=user,
+        organization=organization,
+        name="Konaklama sezonu",
+        engine_key="accommodation",
+        output_snapshot={
+            "total_operating_cost": "7170600.00",
+            "cost_category_totals": {"energy": "1485000.00", "personnel": "2760000.00"},
+            # Same shape as a cost map, but it is revenue and must be excluded.
+            "channel_revenue_totals": {"direct": "7045000.00", "ota": "11206000.00"},
+        },
+    )
+
+    with TestClient(app) as client:
+        response = client.get(
+            f"/organizations/{organization.id}/dashboard",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    entry = response.json()["calculations"][0]
+    group_keys = [group["key"] for group in entry["cost_categories"]]
+    assert group_keys == ["cost_category_totals"]
+    assert "7045000.00" not in str(entry), "revenue must not reach a cost breakdown"
+
+
+def test_headline_total_uses_the_engines_own_grand_total(app_db_session: Session) -> None:
+    user, organization, token = _tenant(app_db_session, suffix="grand-total")
+    _recorded_calculation(
+        app_db_session,
+        user=user,
+        organization=organization,
+        name="Sefer",
+        engine_key="transportation",
+        output_snapshot={
+            "total_trip_cost": "25585.3410",
+            "route_cost": "2460.00",
+            "cost_per_total_km": "31.58684074074074074074074074",
+        },
+    )
+
+    with TestClient(app) as client:
+        response = client.get(
+            f"/organizations/{organization.id}/dashboard",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    entry = response.json()["calculations"][0]
+    # route_cost is only the tolls; the trip total is the engine's headline.
+    assert entry["total_cost"] == "25585.3410"
+    assert entry["unit_cost"] == "31.58684074074074074074074074"
+
+
+def test_engines_without_a_grand_total_report_none(app_db_session: Session) -> None:
+    user, organization, token = _tenant(app_db_session, suffix="no-total")
+    _recorded_calculation(
+        app_db_session,
+        user=user,
+        organization=organization,
+        name="E-ticaret",
+        engine_key="ecommerce",
+        output_snapshot={
+            "total_channel_cost": "18400.00",
+            "contribution_margin_ratio": "0.2153",
+        },
+    )
+
+    with TestClient(app) as client:
+        response = client.get(
+            f"/organizations/{organization.id}/dashboard",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    entry = response.json()["calculations"][0]
+    # Channel fees are not a grand total, so none is claimed.
+    assert entry["total_cost"] is None
+    assert entry["margin_ratio"] == "0.2153"

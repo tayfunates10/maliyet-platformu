@@ -140,6 +140,8 @@ jobs:
         run: npm run management:test
       - name: Calculation workspace contract
         run: npm run calculation:test
+      - name: Dashboard data contract
+        run: npm run dashboard:test
       - name: Decision analysis workspace contract
         run: npm run decision:test
       - name: Next.js build

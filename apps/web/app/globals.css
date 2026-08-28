@@ -7,6 +7,33 @@
   --border: #dde2e9;
   --accent: #1d4ed8;
   --accent-soft: #e8efff;
+
+  /* Enterprise dashboard shell */
+  --sidebar-bg: #0b1533;
+  --sidebar-bg-raised: #142248;
+  --sidebar-fg: #e8edfb;
+  --sidebar-fg-muted: #97a5c6;
+  --sidebar-border: #1e2c55;
+
+  /* Status palette: reserved for state, never reused as a chart series colour. */
+  --status-ok: #047857;
+  --status-ok-soft: #e6f5ee;
+  --status-warn: #b45309;
+  --status-warn-soft: #fdf2e3;
+  --status-fail: #b91c1c;
+  --status-fail-soft: #fdeceb;
+  --status-unknown: #4b5563;
+  --status-unknown-soft: #eef0f4;
+
+  /* Categorical chart hues, assigned in this fixed order and never cycled.
+     Validated for lightness band, chroma floor, CVD separation, normal-vision
+     separation and surface contrast against the light panel surface. */
+  --chart-1: #2563eb;
+  --chart-2: #0d9488;
+  --chart-3: #9333ea;
+  --chart-4: #ea580c;
+  --chart-5: #be185d;
+  --chart-6: #0891b2;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 

@@ -68,16 +68,12 @@ ENGINE_HEADLINE_FIELDS: dict[str, EngineHeadlineFields] = {
     "food_manufacturing": EngineHeadlineFields(unit_cost_key="package_unit_cost"),
     "textile_manufacturing": EngineHeadlineFields(unit_cost_key="finished_piece_unit_cost"),
     "basic_metals": EngineHeadlineFields(unit_cost_key="finished_output_unit_cost"),
-    "ecommerce": EngineHeadlineFields(
-        total_cost_key="total_channel_cost",
-        margin_ratio_key="contribution_margin_ratio",
-    ),
-    "trade": EngineHeadlineFields(
-        total_cost_key="total_channel_cost",
-        margin_ratio_key="contribution_margin_ratio",
-    ),
+    # Commerce engines publish channel-fee and acquisition subtotals but no
+    # grand total, so no field is claimed as one.
+    "ecommerce": EngineHeadlineFields(margin_ratio_key="contribution_margin_ratio"),
+    "trade": EngineHeadlineFields(margin_ratio_key="contribution_margin_ratio"),
     "transportation": EngineHeadlineFields(
-        total_cost_key="route_cost",
+        total_cost_key="total_trip_cost",
         unit_cost_key="cost_per_total_km",
     ),
     "accommodation": EngineHeadlineFields(
@@ -222,6 +218,20 @@ def _decimal_text(snapshot: dict[str, object], key: str | None) -> str | None:
     return value if isinstance(value, str) and value != "" else None
 
 
+def _is_cost_breakdown_key(key: str) -> bool:
+    """Whether one snapshot mapping is a cost breakdown rather than another map.
+
+    Engines also publish revenue maps (for example ``channel_revenue_totals``)
+    with the same shape. Selecting purely on shape would put revenue into a cost
+    table, so the name must read as a cost breakdown and must not be revenue.
+    The rule stays structural: no engine key is hardcoded.
+    """
+
+    if "revenue" in key:
+        return False
+    return "cost" in key or "category" in key or "stage" in key
+
+
 def _cost_category_groups(snapshot: dict[str, object]) -> tuple[CostCategoryGroup, ...]:
     """Collect the engine's own cost breakdown maps without interpreting them.
 
@@ -232,6 +242,8 @@ def _cost_category_groups(snapshot: dict[str, object]) -> tuple[CostCategoryGrou
 
     groups: list[CostCategoryGroup] = []
     for key in sorted(snapshot):
+        if not _is_cost_breakdown_key(key):
+            continue
         value = snapshot[key]
         if not isinstance(value, dict) or not value:
             continue

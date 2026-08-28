@@ -108,3 +108,99 @@ export function turkishFieldLabel(key) {
 export function translatedFieldKeys() {
   return Object.freeze(Object.keys(ENGINE_FIELD_LABELS));
 }
+
+/**
+ * Turkish labels for the enumerated cost categories and production stages that
+ * engines use as keys inside their published cost breakdowns. Same contract as
+ * the field labels: an unknown key falls back to the caller's own humanisation
+ * rather than rendering blank.
+ */
+const ENGINE_CATEGORY_LABELS = Object.freeze({
+  accessory: "Aksesuar",
+  accommodation: "Konaklama",
+  activity: "Aktivite",
+  adblue: "AdBlue",
+  addition: "İlave",
+  advertising: "Reklam",
+  alloy: "Alaşım",
+  amenity: "Oda donanımı",
+  assistant_labor: "Yardımcı işçilik",
+  breakfast: "Kahvaltı",
+  bridge: "Köprü",
+  casting: "Döküm",
+  channel_fee: "Kanal ücreti",
+  chemical: "Kimyasal",
+  cold_chain: "Soğuk zincir",
+  consumable: "Sarf malzeme",
+  cutting: "Kesim",
+  deduction: "İndirim",
+  depreciation: "Amortisman",
+  driver_labor: "Sürücü işçiliği",
+  dyeing: "Boyama",
+  electrode: "Elektrot",
+  embroidery: "Nakış",
+  energy: "Enerji",
+  fabric: "Kumaş",
+  ferry: "Feribot",
+  financing: "Finansman",
+  finishing: "Terbiye",
+  fixed_package: "Sabit paket",
+  flux: "Flaks",
+  forging: "Dövme",
+  fuel: "Yakıt",
+  fulfillment: "Fulfillment",
+  guide: "Rehber",
+  heat_treatment: "Isıl işlem",
+  housekeeping: "Kat hizmetleri",
+  inbound_freight: "Giriş navlunu",
+  insurance: "Sigorta",
+  ironing: "Ütü",
+  labor: "İşçilik",
+  laundry: "Çamaşırhane",
+  lining: "Astar",
+  loading: "Yükleme",
+  machine: "Makine",
+  machining: "Talaşlı imalat",
+  maintenance: "Bakım",
+  marketing: "Pazarlama",
+  marketplace_commission: "Pazaryeri komisyonu",
+  meal: "Yemek",
+  melting: "Ergitme",
+  occupied_variable: "Doluluk değişkeni",
+  other: "Diğer",
+  packaging: "Ambalaj",
+  parking: "Otopark",
+  payment_fee: "Ödeme ücreti",
+  per_diem: "Harcırah",
+  per_participant: "Katılımcı başına",
+  period_fixed: "Dönemsel sabit",
+  personnel: "Personel",
+  primary_metal: "Ana metal",
+  printing: "Baskı",
+  quality: "Kalite",
+  recycled_charge: "Geri dönüşüm şarjı",
+  refractory: "Refrakter",
+  reheating: "Yeniden ısıtma",
+  return_handling: "İade işleme",
+  rolling: "Haddeleme",
+  sewing: "Dikim",
+  software: "Yazılım",
+  storage: "Depolama",
+  subcontracting: "Fason",
+  ticket: "Bilet",
+  toll: "Geçiş ücreti",
+  transfer: "Transfer",
+  transportation: "Taşıma",
+  tyre: "Lastik",
+  unloading: "Boşaltma",
+  water: "Su",
+  yarn: "İplik",
+});
+
+export function turkishCategoryLabel(key) {
+  return Object.hasOwn(ENGINE_CATEGORY_LABELS, key) ? ENGINE_CATEGORY_LABELS[key] : null;
+}
+
+export function translatedCategoryKeys() {
+  return Object.freeze(Object.keys(ENGINE_CATEGORY_LABELS));
+}
