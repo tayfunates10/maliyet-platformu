@@ -132,6 +132,18 @@ for (const file of [
   }
 }
 
+// End-to-end fixtures are test-only: nothing in the production bundle may reach
+// into tests/, so the deterministic payloads can never become a UI fallback.
+for (const file of [
+  ...collectRuntimeFiles(resolve(webRoot, "app")),
+  ...collectRuntimeFiles(resolve(webRoot, "components")),
+  ...collectRuntimeFiles(resolve(webRoot, "lib")),
+]) {
+  const source = readFileSync(file, "utf8");
+  assert.doesNotMatch(source, /["'`][^"'`]*tests\/e2e/, `${file} must not import an e2e fixture`);
+  assert.doesNotMatch(source, /@playwright\/test/, `${file} must not import the test runner`);
+}
+
 // The forbidden `apiData ?? MOCK` shape must not exist anywhere in the dashboard.
 for (const source of dashboardSources) {
   assert.doesNotMatch(source, /\?\?\s*(?:MOCK|FALLBACK|DEMO|SAMPLE)/i);

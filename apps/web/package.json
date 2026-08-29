@@ -17,7 +17,8 @@
     "management:test": "node scripts/test-widget-branding-management.mjs",
     "calculation:test": "node scripts/test-calculation-workspace.mjs",
     "decision:test": "node scripts/test-decision-analysis-workspace.mjs",
-    "dashboard:test": "node scripts/test-dashboard.mjs"
+    "dashboard:test": "node scripts/test-dashboard.mjs",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "next": "16.3.0",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
+    "@playwright/test": "1.56.1",
     "@types/node": "24.13.3",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
