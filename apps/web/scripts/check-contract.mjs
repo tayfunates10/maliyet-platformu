@@ -14,8 +14,15 @@ const requiredFiles = [
   "app/widget-branding/page.module.css",
   "components/widget-branding-manager.tsx",
   "components/widget-branding-manager.module.css",
+  "app/dashboard/page.tsx",
+  "components/dashboard/dashboard-shell.tsx",
+  "components/dashboard/dashboard-sidebar.tsx",
+  "components/dashboard/dashboard.module.css",
+  "components/dashboard/regulatory-readiness-card.tsx",
   "lib/sectors.ts",
   "lib/runtime-config.ts",
+  "lib/dashboard-api.ts",
+  "lib/decimal-format.mjs",
   "lib/widget-branding-management-api.ts",
   "public/widget/v1.0.0/loader.js",
   "public/widget/v1.1.0/loader.js",
@@ -27,6 +34,10 @@ const requiredFiles = [
   "scripts/test-widget-theme-config.mjs",
   "scripts/test-widget-published-branding.mjs",
   "scripts/test-widget-branding-management.mjs",
+  "scripts/test-dashboard.mjs",
+  "playwright.config.mjs",
+  "tests/e2e/dashboard.spec.mjs",
+  "tests/e2e/fixtures/dashboard-fixtures.mjs",
   "biome.json",
   "tsconfig.json",
   ".env.example",
@@ -56,6 +67,14 @@ if (packageJson.devDependencies.typescript !== "7.0.2") {
 
 if (packageJson.devDependencies["@biomejs/biome"] !== "2.5.6") {
   throw new Error("Web linting must remain on the reviewed Biome version");
+}
+
+if (packageJson.devDependencies["@playwright/test"] !== "1.56.1") {
+  throw new Error("Web end-to-end tests must remain on the reviewed Playwright version");
+}
+
+if (packageJson.scripts.e2e !== "playwright test") {
+  throw new Error("End-to-end and screenshot tests must run in CI");
 }
 
 if (packageJson.scripts["runtime:test"] !== "node scripts/test-runtime-config.mjs") {

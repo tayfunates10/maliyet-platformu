@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { turkishFieldLabel } from "../lib/schema-field-labels.mjs";
 import { transitionNullableValue } from "../lib/schema-nullability.mjs";
 import styles from "./calculation-workspace.module.css";
 
@@ -60,6 +61,8 @@ function effectiveSchema(root: JsonObject, schema: JsonObject): JsonObject {
 }
 
 function labelFor(key: string, schema: JsonObject): string {
+  const turkish = turkishFieldLabel(key);
+  if (turkish !== null) return turkish;
   const title = schema.title;
   if (typeof title === "string" && title.trim() !== "") return title;
   return key.replaceAll("_", " ");

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { translatedFieldKeys, turkishFieldLabel } from "../lib/schema-field-labels.mjs";
 import { transitionNullableValue } from "../lib/schema-nullability.mjs";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -170,5 +171,32 @@ assert.doesNotMatch(resultSummary, /dangerouslySetInnerHTML|innerHTML/);
 
 assert.match(page, /CalculationWorkspace/);
 assert.match(page, /Sektör motoru yalnız API allowlist’inden seçilir/);
+
+// Engine schema field labels must reach the Turkish UI, never the Pydantic English title.
+assert.match(schemaEditor, /turkishFieldLabel/);
+assert.match(schemaEditor, /const turkish = turkishFieldLabel\(key\);/);
+assert.match(schemaEditor, /if \(turkish !== null\) return turkish;/);
+
+const labelledKeys = translatedFieldKeys();
+assert.ok(labelledKeys.length >= 90, "engine field label coverage must not silently shrink");
+for (const key of labelledKeys) {
+  const label = turkishFieldLabel(key);
+  assert.equal(typeof label, "string");
+  assert.notEqual(label.trim(), "", `field label for ${key} must not be blank`);
+  assert.doesNotMatch(label, /^[a-z0-9_]+$/, `field label for ${key} must not echo the raw schema key`);
+}
+
+// Representative keys across manufacturing, commerce, logistics, tax and depreciation engines.
+assert.equal(turkishFieldLabel("theoretical_output_per_recipe"), "Reçete başına teorik çıktı");
+assert.equal(turkishFieldLabel("package_content_quantity"), "Paket içerik miktarı");
+assert.equal(turkishFieldLabel("quality_rejected_quantity"), "Kalite reddi miktarı");
+assert.equal(turkishFieldLabel("commission_rate"), "Komisyon oranı");
+assert.equal(turkishFieldLabel("loaded_km"), "Yüklü km");
+assert.equal(turkishFieldLabel("useful_life_months"), "Faydalı ömür (ay)");
+assert.equal(turkishFieldLabel("accounting_profit_before_tax"), "Vergi öncesi muhasebe kârı");
+assert.equal(turkishFieldLabel("declared_monthly_earnings"), "Beyan edilen aylık kazanç");
+
+// An engine field the dictionary does not know must fall back, never render blank.
+assert.equal(turkishFieldLabel("field_added_by_a_future_engine"), null);
 
 console.log("Calculation workspace security contract: PASS");

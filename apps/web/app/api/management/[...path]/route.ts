@@ -23,6 +23,11 @@ const ROUTE_RULES: readonly RouteRule[] = Object.freeze([
   { method: "POST", pattern: /^auth\/logout$/, authenticated: true, allowEmptyBody: true },
   { method: "GET", pattern: /^organizations$/, authenticated: true, allowDeploymentPagination: true },
   { method: "GET", pattern: /^engines$/, authenticated: true },
+  {
+    method: "GET",
+    pattern: new RegExp(`^organizations/${UUID}/dashboard$`),
+    authenticated: true,
+  },
   { method: "GET", pattern: new RegExp(`^engines/${ENGINE_KEY}$`), authenticated: true },
   {
     method: "GET",

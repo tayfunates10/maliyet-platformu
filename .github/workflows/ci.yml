@@ -140,10 +140,42 @@ jobs:
         run: npm run management:test
       - name: Calculation workspace contract
         run: npm run calculation:test
+      - name: Dashboard data contract
+        run: npm run dashboard:test
       - name: Decision analysis workspace contract
         run: npm run decision:test
       - name: Next.js build
         run: npm run build
+
+  web-e2e:
+    name: Web end-to-end
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      API_BASE_URL: "https://api.example.invalid"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install exact direct dependencies
+        run: npm install --no-audit --no-fund --no-package-lock
+      - name: Install end-to-end browser
+        run: npx playwright install --with-deps chromium
+      - name: Build production bundle
+        run: npm run build
+      - name: End-to-end and screenshot tests
+        run: npm run e2e
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: apps/web/tests/e2e/.artifacts
+          retention-days: 7
 
   web-container:
     name: Web production container
