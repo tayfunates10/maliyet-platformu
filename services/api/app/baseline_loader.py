@@ -261,15 +261,15 @@ def load_tr_2026_baseline(
         definition = _get_or_create_definition(session, rule_spec)
         definition_count += 1
         for version_spec in rule_spec.versions:
-            source = sources_by_key.get(version_spec.source_key)
-            if source is None:
+            resolved_source = sources_by_key.get(version_spec.source_key)
+            if resolved_source is None:
                 raise BaselineIntegrityError(
                     f"unknown source key {version_spec.source_key} for {rule_spec.code}"
                 )
             _ensure_version(
                 session,
                 definition=definition,
-                source=source,
+                source=resolved_source,
                 spec=version_spec,
             )
             version_count += 1
